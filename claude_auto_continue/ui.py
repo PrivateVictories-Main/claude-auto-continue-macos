@@ -100,6 +100,11 @@ class TerminalUI:
         self.console.print(build_banner())
 
     def start_dashboard(self) -> None:
+        # Skip the live-updating dashboard when stdout is not a TTY
+        # (e.g. running under launchd, piped to a file, or in CI). Log
+        # lines still print normally via _print().
+        if not self.console.is_terminal:
+            return
         self._live = Live(
             self._render_dashboard(),
             console=self.console,

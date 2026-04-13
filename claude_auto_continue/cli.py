@@ -151,18 +151,33 @@ def main(argv: Optional[list[str]] = None) -> int:
         parser.error(str(exc))
 
     ui = TerminalUI(verbose=settings.verbose)
-    ui.show_banner()
-    _first_run_notice(ui)
 
     # Permission gate — print friendly guide and exit if missing.
     if not has_permission():
         terminal = detect_terminal()
-        ui.warn(
-            f"Accessibility permission is not granted for {terminal.name}."
-        )
-        ui.console.print()
-        ui.console.print(setup_instructions(terminal))
+        if ui.console.is_terminal:
+            # Interactive terminal: full banner + step-by-step guide.
+            ui.show_banner()
+            _first_run_notice(ui)
+            ui.warn(
+                f"Accessibility permission is not granted for {terminal.name}."
+            )
+            ui.console.print()
+            ui.console.print(setup_instructions(terminal))
+        else:
+            # Headless (launchd / pipe / CI): one concise line so log stays
+            # readable even when KeepAlive restarts us every 10 seconds.
+            import sys
+            python_path = sys.executable
+            ui.error(
+                "Accessibility permission missing. Grant it to the Python "
+                f"interpreter: {python_path}  "
+                "(System Settings -> Privacy & Security -> Accessibility)"
+            )
         return 2
+
+    ui.show_banner()
+    _first_run_notice(ui)
 
     notifier = Notifier(
         sound=not settings.silent,
