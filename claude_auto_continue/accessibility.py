@@ -62,9 +62,11 @@ TOOL_USE_CONTEXT_KEYWORDS = (
 
 CONTINUE_LABELS = ("continue", "continue with tool use")
 
-# Maximum tree depth we will recurse into. The Continue button lives within
-# the first few levels of the window; 15 is plenty while still bounding work.
-MAX_RECURSION_DEPTH = 15
+# Maximum tree depth we will traverse. Claude is an Electron app whose
+# React DOM is reflected into the AX tree, so the Continue button sits
+# around depth 17 with plenty of groups wrapping it. 40 is a safe cap
+# that handles the real app with room to spare while still bounding work.
+MAX_RECURSION_DEPTH = 40
 
 
 @dataclass
@@ -245,66 +247,78 @@ def _looks_like_continue(label: str) -> bool:
     return lower.startswith("continue") and len(lower) <= 40
 
 
-def _collect_text(root, max_depth: int = 6, limit_chars: int = 4000) -> str:
-    """Concatenate text-bearing attributes under an element for context checks."""
-    chunks: list[str] = []
-    total = 0
-    for node, _depth in walk(root, max_depth=max_depth):
-        for attr in (kAXTitleAttribute, kAXDescriptionAttribute,
-                     kAXValueAttribute, kAXHelpAttribute):
-            value = _attr(node, attr)
-            if value is None:
-                continue
-            text = str(value).strip()
-            if not text:
-                continue
-            chunks.append(text)
-            total += len(text)
-            if total >= limit_chars:
-                return " \u2502 ".join(chunks)
-    return " \u2502 ".join(chunks)
-
-
-def _has_tool_use_context(window) -> bool:
-    """Check whether the window mentions the tool-use limit anywhere nearby."""
-    haystack = _collect_text(window).lower()
-    return any(keyword in haystack for keyword in TOOL_USE_CONTEXT_KEYWORDS)
-
-
 def find_continue_buttons(
     app: ClaudeApp,
     verbose_cb: Optional[Callable[[str], None]] = None,
 ) -> list[ButtonCandidate]:
-    """Return every Continue-looking button in a tool-use-limit context.
+    """Return every Continue-looking button sitting in a tool-use-limit context.
 
-    We only return buttons from windows where the tool-use-limit copy is
-    present, which avoids firing on generic "Continue" UI (settings dialogs,
-    onboarding, navigation, etc.).
+    Strategy: one tree walk per window. We collect Continue-looking buttons
+    and scan text-bearing attributes for the context keywords at the same
+    time. A window only yields matches if both are present — that's the
+    guard against firing on unrelated Continue buttons (settings, onboarding,
+    confirmation dialogs, etc.).
     """
     found: list[ButtonCandidate] = []
     windows = get_windows(app)
+    text_attrs = (kAXTitleAttribute, kAXDescriptionAttribute,
+                  kAXValueAttribute, kAXHelpAttribute)
+    max_context_chars = 8000
+
     for idx, window in enumerate(windows):
         if window is None:
             continue
-        if not _has_tool_use_context(window):
-            if verbose_cb:
-                verbose_cb(f"window[{idx}] skipped — no tool-use-limit context")
-            continue
+
+        candidates_this_window: list[ButtonCandidate] = []
+        context_chars = 0
+        has_context = False
+        node_count = 0
 
         for node, depth in walk(window):
+            node_count += 1
             role = _element_role(node)
-            if not _is_button(role):
-                continue
-            label = _element_label(node)
-            if verbose_cb:
-                verbose_cb(f"  button@d{depth} role={role!r} label={label!r}")
-            if _looks_like_continue(label):
-                found.append(ButtonCandidate(
-                    element=node,
-                    label=label,
-                    role=role,
-                    window_index=idx,
-                ))
+
+            if _is_button(role):
+                label = _element_label(node)
+                if verbose_cb:
+                    verbose_cb(f"  button@d{depth} role={role!r} label={label!r}")
+                if _looks_like_continue(label):
+                    candidates_this_window.append(ButtonCandidate(
+                        element=node,
+                        label=label,
+                        role=role,
+                        window_index=idx,
+                    ))
+
+            if not has_context and context_chars < max_context_chars:
+                for attr in text_attrs:
+                    value = _attr(node, attr)
+                    if value is None:
+                        continue
+                    text = str(value).strip()
+                    if not text:
+                        continue
+                    context_chars += len(text)
+                    lowered = text.lower()
+                    if any(kw in lowered for kw in TOOL_USE_CONTEXT_KEYWORDS):
+                        has_context = True
+                        break
+
+        if verbose_cb:
+            verbose_cb(
+                f"window[{idx}] nodes={node_count} "
+                f"continue_candidates={len(candidates_this_window)} "
+                f"tool_use_context={'yes' if has_context else 'no'}"
+            )
+
+        if has_context and candidates_this_window:
+            found.extend(candidates_this_window)
+        elif candidates_this_window and verbose_cb:
+            verbose_cb(
+                f"window[{idx}] found Continue button(s) but no tool-use-limit "
+                "context — skipping"
+            )
+
     return found
 
 
