@@ -142,6 +142,52 @@ claude-auto-continue --verbose --dry-run
 
 ---
 
+## Run it as a background service (LaunchAgent)
+
+If you want the tool to run 24/7 — auto-start on login, survive reboots,
+auto-restart on crash, no terminal window required — install it as a
+macOS LaunchAgent:
+
+```bash
+./scripts/install-launchagent.sh
+```
+
+That script generates a user-specific plist at
+`~/Library/LaunchAgents/com.<user>.claude-auto-continue.plist`, loads it
+via `launchctl`, and sends stdout/stderr to
+`~/.claude-auto-continue/launchd.{out,err}.log`.
+
+### One extra permission step for LaunchAgents
+
+A LaunchAgent has **no terminal parent** to inherit Accessibility
+permission from, so the Python binary itself needs to be in the
+Accessibility list. Open `System Settings → Privacy & Security →
+Accessibility`, click `+`, press `Cmd+Shift+G`, and paste:
+
+```
+<repo>/.venv/bin/python
+```
+
+macOS resolves the symlink and grants permission to the real
+`python3.14` (or whatever your version is). Once the toggle is on, the
+agent picks up the new permission on its next restart — typically
+within ten seconds thanks to `KeepAlive` + `ThrottleInterval=10`.
+
+### Handy commands
+
+```bash
+# Status + recent logs
+./scripts/status.sh
+
+# Follow logs live
+tail -f ~/.claude-auto-continue/launchd.out.log
+
+# Stop + uninstall
+./scripts/uninstall-launchagent.sh
+```
+
+---
+
 ## Configuration file
 
 Drop a TOML file at `~/.claude-auto-continue/config.toml` to set defaults
