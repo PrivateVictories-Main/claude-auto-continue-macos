@@ -1,0 +1,5 @@
+pyobjc-core>=10.0
+pyobjc-framework-ApplicationServices>=10.0
+pyobjc-framework-Cocoa>=10.0
+rich>=13.0
+tomli>=2.0;python_version<"3.11"
