@@ -1,33 +1,24 @@
 """
 Terminal scanner — detects the "continue?" pause in Claude Code CLI
-sessions running inside any macOS terminal (Warp, iTerm2, Ghostty,
-Terminal.app, WezTerm, Kitty, Alacritty, Hyper, VS Code, Cursor…).
+sessions running inside *any* macOS terminal (past, present, or future).
 
-Why this is harder than the desktop-app or browser cases:
+Design:
 
-* The Claude Code CLI has no AXButton to press — it paints text, then
-  waits on stdin. There is no native "Continue" control.
-* Different terminals expose their scrollback to AX very differently.
-  Terminal.app/iTerm/VSCode/Ghostty all surface selected text, window
-  title, and the active cell. Warp exposes full pane content. Some
-  expose nothing at all.
-* Sending a keystroke to the wrong terminal is dangerous — a stray
-  Enter could run a shell command.
+1. Look only at the **frontmost app**. If a user is in Claude Code and
+   a pause hits, that terminal is necessarily the one they'd type
+   Return into anyway.
+2. Skip apps that have their own scanner or that we must never target
+   (Claude desktop app, browsers, Finder, Dock, system UI).
+3. Walk the AX tree of the focused window and collect its visible text.
+4. If the text contains one of the narrow, unambiguous Claude Code
+   pause patterns — or a user-supplied extra pattern — synthesize a
+   single Return keystroke via ``CGEventPost``.
 
-So we are conservative by default:
-
-1. Only consider the *frontmost* terminal window — never reach into
-   background windows whose state we can't see clearly.
-2. Collect AX-visible text from every descendant of the focused window.
-3. Only fire when the combined text contains one of the narrow,
-   unambiguous patterns in ``CLAUDE_CODE_PAUSE_PATTERNS`` — these are
-   patterns Claude Code prints verbatim when tool-use limits pause a
-   session.
-4. Deliver the resolution as a keystroke (Enter by default) using
-   CGEventPost against the focused app, not a click.
-
-Callers can add additional patterns via config (``terminal_patterns``
-in config.toml) to adapt to future CLI updates.
+This strategy has no bundle-ID allowlist, so any terminal that exists
+today or ships next year (Warp, iTerm2, Ghostty, Terminal.app, Kitty,
+Alacritty, WezTerm, Hyper, VS Code, Cursor, Windsurf, Tabby, Rio,
+Wave, or whatever comes next) just works as soon as it's the
+frontmost app when Claude Code pauses.
 """
 
 from __future__ import annotations
@@ -58,29 +49,41 @@ except Exception:  # pragma: no cover - missing Quartz
     _HAVE_CGEVENT = False
 
 from . import accessibility as ax
+from . import browser as br
 
 
-# Bundle IDs that identify macOS terminal apps. Kept in sync with
-# permissions.py so the same list drives both the permission hint and
-# the terminal scanner.
-TERMINAL_BUNDLE_IDS = (
-    "com.apple.Terminal",
-    "com.googlecode.iterm2",
-    "net.kovidgoyal.kitty",
-    "io.alacritty",
-    "com.mitchellh.ghostty",
-    "dev.warp.Warp-Stable",
-    "dev.warp.Warp",
-    "co.zeit.hyper",
-    "com.github.wez.wezterm",
-    "com.microsoft.VSCode",
-    "com.microsoft.VSCodeInsiders",
-    "com.visualstudio.code.oss",
-    "com.todesktop.230313mzl4w4u92",   # Cursor
-    "com.exafunction.windsurf",
-    "io.tabby",
-    "co.zeit.hyper",
-)
+# Apps that must never be treated as a terminal. Two reasons to exclude:
+# (a) they have their own scanner elsewhere (Claude desktop app,
+#     browsers), so double-matching would be wasteful and potentially
+#     send Return into a browser window;
+# (b) they're system UI that should never receive synthesized Return
+#     keystrokes (Finder, Dock, Spotlight, System Settings, etc).
+FRONTMOST_EXCLUDE_BUNDLES = frozenset({
+    # Claude desktop app — own scanner.
+    "com.anthropic.claudefordesktop",
+    "com.anthropic.claudedesktop",
+    "com.anthropic.claude",
+    # All known browsers — own scanner.
+    *(b.lower() for b in br.BROWSER_BUNDLE_IDS),
+    # System UI.
+    "com.apple.finder",
+    "com.apple.dock",
+    "com.apple.controlcenter",
+    "com.apple.systempreferences",
+    "com.apple.systemuiserver",
+    "com.apple.windowmanager",
+    "com.apple.loginwindow",
+    "com.apple.spotlight",
+    "com.apple.notificationcenterui",
+    "com.apple.screensaver.engine",
+    "com.apple.preview",
+    "com.apple.screenshot.launcher",
+})
+
+
+# Re-export the browser heuristic so a future fork added in one place
+# is automatically respected here too.
+_looks_like_browser = br.looks_like_browser
 
 
 # Patterns that unambiguously identify a Claude Code tool-use-limit pause.
@@ -121,21 +124,44 @@ class TerminalCandidate:
 
 
 def find_terminals() -> list[TerminalApp]:
+    """Return a list of terminal candidates to scan this tick.
+
+    We target the frontmost app only. If Claude Code is paused and the
+    user is watching, the terminal running it *is* the frontmost app —
+    and Return keystrokes go to the frontmost app anyway. This removes
+    the need for a bundle-ID allowlist, so every new terminal works
+    automatically.
+    """
     workspace = NSWorkspace.sharedWorkspace()
-    found: list[TerminalApp] = []
-    for app in workspace.runningApplications():
-        bid = app.bundleIdentifier()
-        if not bid or bid not in TERMINAL_BUNDLE_IDS:
-            continue
-        pid = int(app.processIdentifier())
-        element = AXUIElementCreateApplication(pid)
-        found.append(TerminalApp(
-            pid=pid,
-            bundle_id=bid,
-            name=app.localizedName() or bid,
-            element=element,
-        ))
-    return found
+    app = workspace.frontmostApplication()
+    if app is None:
+        return []
+
+    bid = (app.bundleIdentifier() or "").lower()
+    if not bid:
+        return []
+    if bid in FRONTMOST_EXCLUDE_BUNDLES:
+        return []
+    if _looks_like_browser(bid):
+        return []
+
+    # Skip helper / agent / accessory processes — they can't hold focus
+    # the way a real GUI app does, so a "frontmost" match is spurious.
+    try:
+        policy = int(app.activationPolicy())
+    except Exception:
+        policy = 0
+    if policy != 0:  # 0 == NSApplicationActivationPolicyRegular
+        return []
+
+    pid = int(app.processIdentifier())
+    element = AXUIElementCreateApplication(pid)
+    return [TerminalApp(
+        pid=pid,
+        bundle_id=app.bundleIdentifier() or "",
+        name=app.localizedName() or "terminal",
+        element=element,
+    )]
 
 
 def _focused_window(app: TerminalApp):

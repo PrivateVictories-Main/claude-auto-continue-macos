@@ -39,9 +39,10 @@ CLAUDE_HOSTS = (
 )
 
 
-# Known browser bundle IDs. Listed in rough order of popularity on macOS so
-# we enumerate smarter browsers first. We match by bundle only — display
-# names vary by region and channel.
+# Known browser bundle IDs. Kept explicit for the fast path; a heuristic
+# below catches unknown browsers (new forks, dev channels we haven't
+# hard-coded) so we don't need updates every time a new Chromium fork
+# ships.
 BROWSER_BUNDLE_IDS = (
     "com.google.Chrome",
     "com.google.Chrome.beta",
@@ -58,16 +59,48 @@ BROWSER_BUNDLE_IDS = (
     "org.mozilla.firefox",
     "org.mozilla.firefoxdeveloperedition",
     "org.mozilla.nightly",
+    "org.mozilla.librewolf",
+    "net.waterfox.waterfox",
     "com.microsoft.edgemac",
     "com.microsoft.edgemac.Beta",
     "com.microsoft.edgemac.Dev",
     "com.microsoft.edgemac.Canary",
     "com.operasoftware.Opera",
     "com.operasoftware.OperaGX",
+    "com.operasoftware.OperaNeon",
     "com.vivaldi.Vivaldi",
     "org.chromium.Chromium",
-    "com.microsoft.VSCode",                 # Edge WebView-backed; harmless
+    "com.naver.Whale",
+    "com.kagi.kagimacOS",                   # Orion
+    "com.kagi.Orion",
+    "com.sidekick.Sidekick",
+    "io.sigmaos.SigmaOS",
+    "com.mighty.app",
+    "com.epicbrowser.Epic",
+    "com.maxthon.Maxthon",
+    "com.yandex.desktop.browser",
+    "com.duckduckgo.macos.browser",
 )
+
+
+# Strings that identify a browser bundle even if we don't know it by
+# name. Checked as case-insensitive substrings. The check is only used
+# when the exact bundle ID is not in BROWSER_BUNDLE_IDS, so false
+# positives for non-browser apps that happen to contain "browser" in
+# their id are fine — we'll still only click a Continue button inside
+# a claude.ai AXWebArea.
+_BROWSER_HEURISTIC_TOKENS = (
+    "browser", "chrome", "chromium", "firefox", "safari",
+    "webkit", "opera", "edge", "brave", "vivaldi", "arc",
+    "duckduckgo", "orion", "whale",
+)
+
+
+def looks_like_browser(bundle_id: str) -> bool:
+    lowered = (bundle_id or "").lower()
+    if not lowered:
+        return False
+    return any(tok in lowered for tok in _BROWSER_HEURISTIC_TOKENS)
 
 
 @dataclass
@@ -89,13 +122,31 @@ class BrowserCandidate:
 
 
 def find_browsers() -> list[BrowserApp]:
-    """Return every running browser we recognise."""
+    """Return every running browser we recognise.
+
+    We match in two ways: (1) exact bundle ID in ``BROWSER_BUNDLE_IDS``
+    (the fast path for known browsers), and (2) the heuristic in
+    ``looks_like_browser`` which catches brand-new forks or dev channels
+    that ship after this list was last updated. Either match is enough —
+    we only ever press Continue inside a claude.ai ``AXWebArea`` subtree,
+    so a false positive is harmless.
+    """
     workspace = NSWorkspace.sharedWorkspace()
     running = workspace.runningApplications()
     found: list[BrowserApp] = []
     for app in running:
         bid = app.bundleIdentifier()
-        if not bid or bid not in BROWSER_BUNDLE_IDS:
+        if not bid:
+            continue
+        if bid not in BROWSER_BUNDLE_IDS and not looks_like_browser(bid):
+            continue
+        # Skip helper / agent / accessory processes; they never host a
+        # user-facing tab. ActivationPolicy 0 == NSApplicationActivationPolicyRegular.
+        try:
+            policy = int(app.activationPolicy())
+        except Exception:
+            policy = 0
+        if policy != 0:
             continue
         pid = int(app.processIdentifier())
         element = AXUIElementCreateApplication(pid)

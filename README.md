@@ -18,12 +18,20 @@ once and resumes whichever one is paused:
 - **The native Claude desktop app** — AXPress on the tool-use-limit
   Continue button.
 - **claude.ai in any browser** — Safari, Chrome, Brave, Arc, Dia, Edge,
-  Opera, Vivaldi, Firefox, and ChatGPT Atlas. Only the claude.ai tab is
-  scanned; other tabs and sites are ignored.
-- **Claude Code CLI** (opt-in) — Warp, iTerm2, Ghostty, Terminal.app, VS
-  Code, Cursor, Windsurf, Hyper, WezTerm, Kitty, and Alacritty. Sends a
-  single Return keystroke only when a narrow tool-use-limit pattern is
-  on screen.
+  Opera, Vivaldi, Firefox, Atlas, and any other Chromium/WebKit/Gecko
+  browser that ships on macOS (detected via bundle-ID heuristic, so
+  brand-new forks work with no code update). Only `claude.ai` web-areas
+  are scanned; other tabs and sites are ignored. Works across many open
+  tabs — every `claude.ai` `AXWebArea` in every window is visited each
+  tick.
+- **Claude Code CLI** (opt-in) — any terminal you put in front. We watch
+  the frontmost app and send a single Return keystroke when a narrow
+  tool-use-limit pattern appears. Because the frontmost app is whoever
+  receives the keystroke anyway, **every terminal works without an
+  allowlist**: Warp, iTerm2, Ghostty, Terminal.app, Kitty, Alacritty,
+  WezTerm, Hyper, Tabby, Rio, Wave, VS Code, Cursor, Windsurf — current
+  or future. Browsers, Finder, Dock, system UI and the Claude desktop
+  app are explicitly excluded.
 
 It only ever acts in the correct context — it ignores unrelated
 "Continue" buttons elsewhere in the UI.
@@ -207,6 +215,19 @@ claude-auto-continue --no-dashboard
 claude-auto-continue --dashboard-port 9001
 ```
 
+### Closed the tab? Reopen it without thinking
+
+```bash
+./scripts/open-dashboard.sh
+```
+
+Probes `127.0.0.1:8787` through `8792` (the fallback range the
+dashboard rolls through when the primary port is already taken), finds
+the first one that responds, and opens it. Pass `--print` to just echo
+the URL. The script only considers a port "ours" if `/api/state`
+returns the expected payload, so it won't open some unrelated localhost
+you had running.
+
 ---
 
 ## Run it as a background service (LaunchAgent)
@@ -337,8 +358,11 @@ Honesty section:
 - If Anthropic changes the Continue button's label in a future release,
   the tool needs a one-line update. The `--verbose` flag helps diagnose
   this quickly — the tree walk prints every button it sees.
-- This tool **cannot** touch `claude.ai` in a browser. Use the browser
-  extension linked above for that.
+- **Background tabs in Chromium browsers** can have their renderer AX
+  tree briefly suspended to save CPU. In practice we still pick up the
+  Continue button because `AXEnhancedUserInterface` keeps the tree
+  populated, but if a tab has been inert for hours and a pause arrives
+  that exact moment, one tick may miss it. The next tick finds it.
 - macOS pre-12 is not supported (`pyobjc` Accessibility features require
   a modern Foundation).
 - macOS only. Windows / Linux are tracked in the roadmap.
