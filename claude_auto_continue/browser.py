@@ -1,0 +1,228 @@
+"""
+Browser scanner — finds Continue-on-tool-use-limit buttons inside claude.ai
+tabs of any running browser, without requiring a browser extension.
+
+Approach:
+* Enumerate running apps whose bundle id matches a known browser.
+* For each, flip AXEnhancedUserInterface on (Chromium hides the DOM from AX
+  by default, similar to Electron's AXManualAccessibility). Safari exposes
+  its DOM when "Allow apps to control this computer using accessibility
+  features" is on, which Accessibility permission provides.
+* Walk windows → tabs. For each web-content subtree, collect its URL from
+  the `AXURL` attribute on an AXWebArea-like node. Skip subtrees whose URL
+  is not a claude.ai origin.
+* Within a claude.ai subtree, reuse the Continue-button heuristic from
+  `accessibility.py` (Continue-looking label + tool-use-limit context).
+
+We press found buttons via AXPress, same as the native-app path.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Callable, Iterable, Optional
+from urllib.parse import urlparse
+
+from ApplicationServices import (
+    AXUIElementCreateApplication,
+    AXUIElementSetAttributeValue,
+)
+from Cocoa import NSWorkspace
+
+from . import accessibility as ax
+
+
+CLAUDE_HOSTS = (
+    "claude.ai",
+    "www.claude.ai",
+    "claude.anthropic.com",
+)
+
+
+# Known browser bundle IDs. Listed in rough order of popularity on macOS so
+# we enumerate smarter browsers first. We match by bundle only — display
+# names vary by region and channel.
+BROWSER_BUNDLE_IDS = (
+    "com.google.Chrome",
+    "com.google.Chrome.beta",
+    "com.google.Chrome.dev",
+    "com.google.Chrome.canary",
+    "com.apple.Safari",
+    "com.apple.SafariTechnologyPreview",
+    "com.brave.Browser",
+    "com.brave.Browser.beta",
+    "com.brave.Browser.nightly",
+    "company.thebrowser.Browser",           # Arc
+    "company.thebrowser.dia",               # Dia by The Browser Company
+    "com.openai.atlas",                     # ChatGPT Atlas
+    "org.mozilla.firefox",
+    "org.mozilla.firefoxdeveloperedition",
+    "org.mozilla.nightly",
+    "com.microsoft.edgemac",
+    "com.microsoft.edgemac.Beta",
+    "com.microsoft.edgemac.Dev",
+    "com.microsoft.edgemac.Canary",
+    "com.operasoftware.Opera",
+    "com.operasoftware.OperaGX",
+    "com.vivaldi.Vivaldi",
+    "org.chromium.Chromium",
+    "com.microsoft.VSCode",                 # Edge WebView-backed; harmless
+)
+
+
+@dataclass
+class BrowserApp:
+    pid: int
+    bundle_id: str
+    name: str
+    element: object  # AXUIElementRef
+
+
+@dataclass
+class BrowserCandidate:
+    """A Continue button found inside a claude.ai web-view subtree."""
+    element: object
+    label: str
+    browser_name: str
+    browser_pid: int
+    url: str
+
+
+def find_browsers() -> list[BrowserApp]:
+    """Return every running browser we recognise."""
+    workspace = NSWorkspace.sharedWorkspace()
+    running = workspace.runningApplications()
+    found: list[BrowserApp] = []
+    for app in running:
+        bid = app.bundleIdentifier()
+        if not bid or bid not in BROWSER_BUNDLE_IDS:
+            continue
+        pid = int(app.processIdentifier())
+        element = AXUIElementCreateApplication(pid)
+        found.append(BrowserApp(
+            pid=pid,
+            bundle_id=bid,
+            name=app.localizedName() or bid,
+            element=element,
+        ))
+    return found
+
+
+def enable_enhanced_ax(browser: BrowserApp) -> bool:
+    """Chromium/Firefox/Safari expose AX best when enhanced mode is on.
+
+    Writing the attribute is idempotent and safe to retry on every scan.
+    Returns True if either AXEnhancedUserInterface or AXManualAccessibility
+    was set successfully — one or the other is right depending on browser.
+    """
+    ok_any = False
+    for attr in ("AXEnhancedUserInterface", "AXManualAccessibility"):
+        try:
+            err = AXUIElementSetAttributeValue(browser.element, attr, True)
+        except Exception:
+            continue
+        if err == 0:
+            ok_any = True
+    return ok_any
+
+
+def _is_claude_url(url: str) -> bool:
+    try:
+        host = urlparse(url).hostname or ""
+    except Exception:
+        return False
+    host = host.lower()
+    return any(host == h or host.endswith("." + h) for h in CLAUDE_HOSTS)
+
+
+def _read_url(element) -> Optional[str]:
+    """Pull a URL off an AX node (AXWebArea exposes AXURL)."""
+    for attr in ("AXURL", "AXDocument"):
+        value = ax._attr(element, attr)
+        if value is None:
+            continue
+        # AXURL comes through as NSURL; str() on it gives the absolute URL.
+        text = str(value).strip()
+        if text.startswith(("http://", "https://")):
+            return text
+    return None
+
+
+def _iter_web_subtrees(root) -> Iterable[tuple[object, str]]:
+    """Yield (subtree_root, url) pairs for every web view under ``root``.
+
+    We descend via the normal AX walk but stop recursing into a node once
+    we've claimed it as a web subtree — the url applies to everything
+    inside. This keeps each claude.ai tab self-contained and lets us skip
+    non-Claude tabs cheaply.
+    """
+    for node, _depth in ax.walk(root, max_depth=ax.MAX_RECURSION_DEPTH):
+        role = ax._element_role(node)
+        if role in ("AXWebArea", "AXWebAreaRole"):
+            url = _read_url(node) or ""
+            yield node, url
+
+
+def find_browser_continue_buttons(
+    browser: BrowserApp,
+    verbose_cb: Optional[Callable[[str], None]] = None,
+) -> list[BrowserCandidate]:
+    """Return Continue candidates inside claude.ai tabs of this browser."""
+    found: list[BrowserCandidate] = []
+    windows = ax.get_windows(browser)
+
+    for win_idx, window in enumerate(windows):
+        if window is None:
+            continue
+
+        web_roots = list(_iter_web_subtrees(window))
+        if verbose_cb:
+            verbose_cb(
+                f"  browser={browser.name} window[{win_idx}] "
+                f"web_areas={len(web_roots)}"
+            )
+        if not web_roots:
+            continue
+
+        for web_root, url in web_roots:
+            if not url or not _is_claude_url(url):
+                if verbose_cb and url:
+                    verbose_cb(f"    skip non-claude tab: {url}")
+                continue
+
+            if verbose_cb:
+                verbose_cb(f"    scan claude tab: {url}")
+
+            has_context = False
+            continue_buttons: list[tuple[object, str, str]] = []
+
+            for node, _depth in ax.walk(web_root,
+                                        max_depth=ax.MAX_RECURSION_DEPTH):
+                role = ax._element_role(node)
+                label = ax._element_label(node)
+
+                if ax._is_button(role) and ax._looks_like_continue(label):
+                    continue_buttons.append((node, label, role))
+
+                if not has_context and label:
+                    lowered = label.lower()
+                    if any(kw in lowered
+                           for kw in ax.TOOL_USE_CONTEXT_KEYWORDS):
+                        has_context = True
+
+            if has_context and continue_buttons:
+                for node, label, _role in continue_buttons:
+                    found.append(BrowserCandidate(
+                        element=node,
+                        label=label,
+                        browser_name=browser.name,
+                        browser_pid=browser.pid,
+                        url=url,
+                    ))
+            elif continue_buttons and verbose_cb:
+                verbose_cb(
+                    f"    found Continue button in {url} but no "
+                    "tool-use-limit context — skipping"
+                )
+
+    return found
