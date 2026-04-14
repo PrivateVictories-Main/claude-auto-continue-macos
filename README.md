@@ -181,6 +181,34 @@ claude-auto-continue --verbose --dry-run
 
 ---
 
+## Localhost control dashboard
+
+Every run now ships with a small, glassy, Claude-themed dashboard at
+**`http://127.0.0.1:8787`**. Toggle any of the three scanners on or off
+live, tune the polling interval and cooldown, enable dry-run, and watch
+events stream in from the running monitor. The dashboard talks to the
+same process that's doing the clicking — changes apply immediately, no
+restart required.
+
+It binds only to `127.0.0.1`, so it's never exposed to the network.
+Disable with `--no-dashboard` or move it with
+`--dashboard-port 9000` / `--dashboard-host 127.0.0.1`. If the default
+port is busy, we automatically try the next five.
+
+```bash
+# Just run it — the dashboard is on by default.
+claude-auto-continue
+# → dashboard running at http://127.0.0.1:8787
+
+# Or disable it entirely.
+claude-auto-continue --no-dashboard
+
+# Pick a custom port.
+claude-auto-continue --dashboard-port 9001
+```
+
+---
+
 ## Run it as a background service (LaunchAgent)
 
 If you want the tool to run 24/7 — auto-start on login, survive reboots,

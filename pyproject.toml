@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "claude-auto-continue-macos"
-version = "0.1.0"
+version = "0.3.0"
 description = "Automatically click the 'Continue' button in the Claude macOS desktop app when tool-use limits pause your session."
 readme = "README.md"
 license = { text = "MIT" }
@@ -45,3 +45,6 @@ Issues = "https://github.com/PrivateVictories-Main/claude-auto-continue-macos/is
 [tool.setuptools.packages.find]
 include = ["claude_auto_continue*"]
 exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+claude_auto_continue = ["dashboard_ui.html"]

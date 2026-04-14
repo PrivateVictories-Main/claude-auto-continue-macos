@@ -35,6 +35,7 @@ class MonitorContext:
     notifier: Notifier
     log: ActivityLog
     stop: Callable[[], bool]
+    state: Optional[object] = None  # dashboard.SharedState, optional
 
 
 class Monitor:
@@ -45,6 +46,41 @@ class Monitor:
         self._last_click_at: float = 0.0
         self._seen_browser_pids: set[int] = set()
 
+    # ---- shared-state helpers (dashboard) -----------------------------
+
+    def _emit(self, level: str, message: str) -> None:
+        state = self.ctx.state
+        if state is not None:
+            try:
+                state.publish_log(level, message)
+            except Exception:
+                pass
+
+    def _sync_status(self, **overrides) -> None:
+        state = self.ctx.state
+        if state is None:
+            return
+        ui_status = self.ctx.ui.status
+        payload = {
+            "state": ui_status.state,
+            "state_style": ui_status.state_style,
+            "claude_detected": ui_status.claude_detected,
+            "ax_enabled": ui_status.ax_enabled,
+            "total_continues": ui_status.total_continues,
+            "last_continue_at": (
+                None
+                if ui_status.last_continue_at is None
+                else time.time() - (time.monotonic() - ui_status.last_continue_at)
+            ),
+            "started_at": time.time() - ui_status.uptime(),
+            "dry_run": ui_status.dry_run,
+        }
+        payload.update(overrides)
+        try:
+            state.set_status(**payload)
+        except Exception:
+            pass
+
     # ------------------------------------------------------------------
 
     def run(self) -> None:
@@ -53,23 +89,29 @@ class Monitor:
         ui.status.state = "Watching"
         ui.status.state_style = "green"
         ui.status.dry_run = s.dry_run
+        self._sync_status()
 
         while not self.ctx.stop():
             try:
                 self._tick()
             except Exception as exc:  # never crash the loop
                 ui.error(f"scan error: {exc!r}")
+                self._emit("error", f"scan error: {exc!r}")
 
             ui.refresh()
+            self._sync_status()
 
             if s.max_continues and ui.status.total_continues >= s.max_continues:
-                ui.warn(
+                msg = (
                     f"reached --max-continues cap of {s.max_continues}; "
                     "shutting down"
                 )
+                ui.warn(msg)
+                self._emit("warn", msg)
                 return
 
-            self._sleep(s.interval)
+            # Live-reload settings each iteration — dashboard mutations apply.
+            self._sleep(self.ctx.settings.interval)
 
     # ------------------------------------------------------------------
 
@@ -95,7 +137,9 @@ class Monitor:
 
         if app is None:
             if self._current_app is not None:
-                ui.warn("Claude app closed — waiting for it to return")
+                msg = "Claude app closed — waiting for it to return"
+                ui.warn(msg)
+                self._emit("warn", msg)
             self._current_app = None
             self._current_pid = None
             ui.status.claude_detected = False
@@ -114,10 +158,12 @@ class Monitor:
             ok = ax.enable_manual_accessibility(app)
             ui.status.ax_enabled = ok
             verb = "detected" if first_time else "restarted"
-            ui.info(
+            msg = (
                 f"Claude {verb} (pid {app.pid}) — AXManualAccessibility "
                 f"{'enabled' if ok else 'FAILED'}"
             )
+            ui.info(msg)
+            self._emit("info", msg)
 
         verbose_cb = ui.debug if ui.verbose else None
         candidates = ax.find_continue_buttons(app, verbose_cb=verbose_cb)
@@ -207,20 +253,26 @@ class Monitor:
             ui.status.total_continues += 1
             ui.status.last_continue_at = time.monotonic()
             self._last_click_at = time.monotonic()
-            ui.warn(f"[DRY RUN] Would have sent Return to {source}")
+            msg = f"[DRY RUN] Would have sent Return to {source}"
+            ui.warn(msg)
+            self._emit("warn", msg)
             self.ctx.log.dry_run_hit(ui.status.total_continues)
             return True
 
         ok = term.send_return_to(target.terminal_pid)
         if not ok:
-            ui.error(f"failed to send Return to {source}; will retry next tick")
+            msg = f"failed to send Return to {source}; will retry next tick"
+            ui.error(msg)
+            self._emit("error", msg)
             return True
 
         ui.status.total_continues += 1
         ui.status.last_continue_at = time.monotonic()
         self._last_click_at = time.monotonic()
         total = ui.status.total_continues
-        ui.success(f"auto-continued #{total} — sent Return to {source}")
+        msg = f"auto-continued #{total} — sent Return to {source}"
+        ui.success(msg)
+        self._emit("success", msg)
         self.ctx.log.auto_continue(total)
         self.ctx.notifier.announce_continue(total, label=target.matched_pattern)
         return True
@@ -253,20 +305,26 @@ class Monitor:
             ui.status.total_continues += 1
             ui.status.last_continue_at = time.monotonic()
             self._last_click_at = time.monotonic()
-            ui.warn(f"[DRY RUN] Would have clicked {label!r} in {source}")
+            msg = f"[DRY RUN] Would have clicked {label!r} in {source}"
+            ui.warn(msg)
+            self._emit("warn", msg)
             self.ctx.log.dry_run_hit(ui.status.total_continues)
             return
 
         ok = ax.press(element)
         if not ok:
-            ui.error(f"AXPress failed on {label!r} in {source}; will retry")
+            msg = f"AXPress failed on {label!r} in {source}; will retry"
+            ui.error(msg)
+            self._emit("error", msg)
             return
 
         ui.status.total_continues += 1
         ui.status.last_continue_at = time.monotonic()
         self._last_click_at = time.monotonic()
         total = ui.status.total_continues
-        ui.success(f"auto-continued #{total} — pressed {label!r} in {source}")
+        msg = f"auto-continued #{total} — pressed {label!r} in {source}"
+        ui.success(msg)
+        self._emit("success", msg)
         self.ctx.log.auto_continue(total)
         self.ctx.notifier.announce_continue(total, label=label)
 
