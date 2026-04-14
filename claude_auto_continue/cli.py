@@ -143,6 +143,30 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--no-dashboard",
+        dest="dashboard",
+        action="store_false",
+        default=True,
+        help="Disable the localhost control dashboard.",
+    )
+    parser.add_argument(
+        "--dashboard-port",
+        type=int,
+        metavar="PORT",
+        default=8787,
+        help=(
+            "Port for the localhost dashboard (default 8787). Binds to "
+            "127.0.0.1 only; never exposed to the network."
+        ),
+    )
+    parser.add_argument(
+        "--dashboard-host",
+        type=str,
+        metavar="HOST",
+        default="127.0.0.1",
+        help="Bind address for the dashboard (default 127.0.0.1).",
+    )
+    parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s {__version__}",
@@ -248,12 +272,37 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     ui.start_dashboard()
 
+    shared_state = None
+    dashboard = None
+    if args.dashboard:
+        from .dashboard import SharedState, try_start
+        shared_state = SharedState(settings=settings)
+        fallback_ports = tuple(
+            range(args.dashboard_port + 1, args.dashboard_port + 6)
+        )
+        dashboard, err = try_start(
+            shared_state,
+            host=args.dashboard_host,
+            port=args.dashboard_port,
+            port_range=fallback_ports,
+        )
+        if dashboard is not None:
+            ui.info(f"dashboard running at {dashboard.url}")
+            shared_state.publish_log(
+                "info", f"dashboard running at {dashboard.url}"
+            )
+        else:
+            ui.warn(
+                f"dashboard could not start ({err}); running without it"
+            )
+
     ctx = MonitorContext(
         settings=settings,
         ui=ui,
         notifier=notifier,
         log=log,
         stop=lambda: stopped["value"],
+        state=shared_state,
     )
     monitor = Monitor(ctx)
 
@@ -268,6 +317,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         monitor.run()
     finally:
         ui.stop_dashboard()
+        if dashboard is not None:
+            try:
+                dashboard.stop()
+            except Exception:
+                pass
         log.session_end(
             total=ui.status.total_continues,
             uptime_seconds=ui.status.uptime(),
