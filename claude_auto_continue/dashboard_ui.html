@@ -131,39 +131,67 @@
       font-size: 12px; color: var(--claude-muted); margin-top: 2px;
     }
 
-    .live-pill {
+    .pill-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .pill {
       display: inline-flex;
       align-items: center;
       gap: 10px;
-      padding: 8px 16px 8px 12px;
+      padding: 7px 14px 7px 12px;
       border-radius: 999px;
       background: var(--claude-surface);
       border: 1px solid var(--claude-border);
       backdrop-filter: blur(24px);
       -webkit-backdrop-filter: blur(24px);
-      font-size: 12.5px;
+      font-size: 12px;
       color: var(--claude-dim);
       letter-spacing: 0.01em;
+      white-space: nowrap;
+      transition: color 220ms ease, border-color 220ms ease,
+                  background 220ms ease;
     }
+    .live-pill { /* alias, kept for clarity */ }
     .dot {
-      width: 8px; height: 8px; border-radius: 50%;
+      width: 7px; height: 7px; border-radius: 50%;
       background: var(--claude-muted);
       box-shadow: 0 0 0 0 rgba(120, 192, 139, 0);
     }
-    .live-pill.online .dot {
+    .pill.online .dot {
       background: var(--claude-green);
       animation: pulse 2.2s infinite;
     }
+    .pill.paused .dot { background: var(--claude-yellow); }
+    .pill.paused { color: var(--claude-yellow);
+                   border-color: rgba(226, 184, 76, 0.24); }
     @keyframes pulse {
       0%   { box-shadow: 0 0 0 0 rgba(120, 192, 139, 0.55); }
-      70%  { box-shadow: 0 0 0 12px rgba(120, 192, 139, 0); }
+      70%  { box-shadow: 0 0 0 10px rgba(120, 192, 139, 0); }
       100% { box-shadow: 0 0 0 0 rgba(120, 192, 139, 0); }
     }
+    .uptime-pill {
+      font-family: var(--mono);
+      font-size: 11.5px;
+      color: var(--claude-muted);
+    }
+    .uptime-pill .uptime-label {
+      color: var(--claude-muted);
+      font-family: var(--font);
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+    .uptime-pill.paused .uptime-value { color: var(--claude-yellow); }
+    .uptime-pill.active .uptime-value { color: var(--claude-warm); }
 
     /* ─── Hero metric row ─────────────────────────────────────────── */
     .hero {
       display: grid;
-      grid-template-columns: 1.2fr 1fr 1fr;
+      grid-template-columns: 1.5fr 1fr;
       gap: 18px;
       margin-bottom: 28px;
     }
@@ -208,14 +236,18 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      min-height: 130px;
+      min-height: 138px;
       justify-content: center;
+      position: relative;
     }
     .stat .label {
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.16em;
       color: var(--claude-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
     .stat .value {
       font-size: 42px;
@@ -228,7 +260,59 @@
       font-size: 13px; color: var(--claude-dim);
     }
     .stat.primary .value { color: var(--claude-primary); }
-    .stat.state .value { font-size: 26px; }
+    .stat.state .value {
+      font-size: 32px;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* State indicator orb with pulsing halo */
+    .state-orb {
+      width: 10px; height: 10px; border-radius: 50%;
+      flex-shrink: 0;
+      background: var(--claude-muted);
+      box-shadow: 0 0 0 0 rgba(0,0,0,0);
+      transition: background 260ms ease;
+    }
+    .stat.state.tone-green .state-orb {
+      background: var(--claude-green);
+      animation: halo-green 2.4s ease-in-out infinite;
+    }
+    .stat.state.tone-yellow .state-orb {
+      background: var(--claude-yellow);
+      animation: halo-yellow 2.8s ease-in-out infinite;
+    }
+    .stat.state.tone-red .state-orb {
+      background: var(--claude-red);
+      animation: halo-red 2s ease-in-out infinite;
+    }
+    .stat.state.tone-paused .state-orb {
+      background: var(--claude-muted);
+    }
+    .stat.state.tone-paused .value { color: var(--claude-dim); }
+    @keyframes halo-green {
+      0%,100% { box-shadow: 0 0 0 0 rgba(120, 192, 139, 0.45); }
+      50%     { box-shadow: 0 0 0 10px rgba(120, 192, 139, 0); }
+    }
+    @keyframes halo-yellow {
+      0%,100% { box-shadow: 0 0 0 0 rgba(226, 184, 76, 0.45); }
+      50%     { box-shadow: 0 0 0 10px rgba(226, 184, 76, 0); }
+    }
+    @keyframes halo-red {
+      0%,100% { box-shadow: 0 0 0 0 rgba(224, 101, 101, 0.55); }
+      50%     { box-shadow: 0 0 0 10px rgba(224, 101, 101, 0); }
+    }
+
+    /* Counter flash when continues increment */
+    @keyframes counter-flash {
+      0%   { transform: scale(1);   text-shadow: 0 0 0   rgba(217,119,87,0); }
+      35%  { transform: scale(1.08); text-shadow: 0 0 24px rgba(217,119,87,0.65); }
+      100% { transform: scale(1);   text-shadow: 0 0 0   rgba(217,119,87,0); }
+    }
+    .stat.primary .value.flash {
+      animation: counter-flash 680ms cubic-bezier(.2,.8,.2,1);
+    }
 
     /* ─── Section titles ──────────────────────────────────────────── */
     .section-title {
@@ -538,28 +622,34 @@
           <div class="t2">local dashboard · <span id="version">v…</span></div>
         </div>
       </div>
-      <div class="live-pill" id="live-pill">
-        <span class="dot"></span>
-        <span id="live-label">connecting…</span>
+      <div class="pill-row">
+        <div class="pill uptime-pill" id="uptime-pill" title="Time since scanning started">
+          <span class="uptime-label">up</span>
+          <span class="uptime-value" id="uptime-value">0s</span>
+        </div>
+        <div class="pill live-pill" id="live-pill">
+          <span class="dot"></span>
+          <span id="live-label">connecting…</span>
+        </div>
       </div>
     </header>
 
     <!-- Hero stats -->
     <section class="hero">
-      <div class="card stat state">
-        <div class="label">Monitor state</div>
-        <div class="value" id="stat-state">…</div>
+      <div class="card stat state" id="stat-state-card">
+        <div class="label">
+          <span>Monitor state</span>
+        </div>
+        <div class="value">
+          <span class="state-orb" aria-hidden="true"></span>
+          <span id="stat-state">…</span>
+        </div>
         <div class="sub" id="stat-state-sub">—</div>
       </div>
       <div class="card stat primary">
         <div class="label">Auto-continues</div>
         <div class="value" id="stat-continues">0</div>
         <div class="sub" id="stat-last">none yet</div>
-      </div>
-      <div class="card stat">
-        <div class="label">Uptime</div>
-        <div class="value" id="stat-uptime">0s</div>
-        <div class="sub" id="stat-detected">Claude not detected</div>
       </div>
     </section>
 
@@ -744,34 +834,96 @@
     };
 
     // ---- state paint ----------------------------------------------
+    let lastContinues = 0;
+    let activeSince = null;  // epoch sec. null ⇒ paused.
+
+    const allScannersOff = () => {
+      const cfg = state.settings || {};
+      return !cfg.scan_app && !cfg.scan_browsers && !cfg.scan_terminals;
+    };
+
+    // Advance the "active since" anchor when scanning flips.
+    // On initial load we adopt the monitor's started_at so uptime is
+    // honest about the process's existing lifetime.
+    const refreshActiveSince = (initial = false) => {
+      const paused = allScannersOff();
+      if (paused) {
+        activeSince = null;
+        return;
+      }
+      if (activeSince === null) {
+        activeSince = initial
+          ? ((state.status || {}).started_at || Date.now() / 1000)
+          : (Date.now() / 1000);
+      }
+    };
+
+    const activeUptimeSec = () => {
+      if (activeSince === null) return 0;
+      return Math.max(0, Date.now() / 1000 - activeSince);
+    };
+
     const paintStatus = () => {
       const s = state.status || {};
-      $("#stat-state").textContent = s.state || "…";
-      $("#stat-state-sub").textContent = s.ax_enabled
-        ? "AX tree enabled"
-        : (s.claude_detected ? "AX pending" : "no Claude process");
-      $("#stat-continues").textContent = s.total_continues ?? 0;
+      const paused = allScannersOff();
 
-      const lastEl = $("#stat-last");
-      if (s.last_continue_at) {
-        lastEl.textContent = `last: ${fmtTime(s.last_continue_at)}`;
+      // State card — paused treatment overrides monitor state.
+      const card = $("#stat-state-card");
+      card.classList.remove("tone-green", "tone-yellow", "tone-red",
+                            "tone-paused");
+      if (paused) {
+        $("#stat-state").textContent = "Paused";
+        $("#stat-state-sub").textContent = "All scanners off";
+        card.classList.add("tone-paused");
       } else {
-        lastEl.textContent = "none yet";
+        $("#stat-state").textContent = s.state || "…";
+        $("#stat-state-sub").textContent = s.ax_enabled
+          ? "AX tree enabled"
+          : (s.claude_detected ? "AX pending" : "looking for Claude…");
+        const tone = (s.state_style || "yellow").toLowerCase();
+        card.classList.add(
+          tone === "green" ? "tone-green" :
+          tone === "red"   ? "tone-red"   : "tone-yellow"
+        );
       }
 
-      $("#stat-uptime").textContent = fmtUptime(s.uptime || 0);
-      $("#stat-detected").textContent = s.claude_detected
-        ? "Claude app detected"
-        : "Claude app not running";
+      // Continues — flash when the count increments.
+      const contEl = $("#stat-continues");
+      const n = s.total_continues ?? 0;
+      contEl.textContent = n;
+      if (n > lastContinues) {
+        contEl.classList.remove("flash");
+        void contEl.offsetWidth; // restart animation
+        contEl.classList.add("flash");
+      }
+      lastContinues = n;
 
+      const lastEl = $("#stat-last");
+      lastEl.textContent = s.last_continue_at
+        ? `last: ${fmtTime(s.last_continue_at)}`
+        : (paused ? "idle while paused" : "none yet");
+
+      // Topbar uptime pill — elapsed since scanning went active; pause
+      // resets it, so flipping everything off really does go to zero.
+      const upPill = $("#uptime-pill");
+      upPill.classList.toggle("paused", paused);
+      upPill.classList.toggle("active", !paused);
+      $("#uptime-value").textContent = paused
+        ? "paused"
+        : fmtUptime(activeUptimeSec());
+
+      // Live pill — green when SSE + any scanner on; yellow when paused.
       const pill = $("#live-pill");
       const label = $("#live-label");
-      if (sseOpen) {
+      pill.classList.remove("online", "paused");
+      if (!sseOpen) {
+        label.textContent = "reconnecting…";
+      } else if (paused) {
+        pill.classList.add("paused");
+        label.textContent = "paused";
+      } else {
         pill.classList.add("online");
         label.textContent = "live";
-      } else {
-        pill.classList.remove("online");
-        label.textContent = "reconnecting…";
       }
     };
 
@@ -782,6 +934,8 @@
         const key = card.dataset.target;
         card.classList.toggle("on", !!cfg[key]);
       });
+      // Re-anchor the active-since timer if the paused/active state changed.
+      refreshActiveSince();
       // sliders
       const setSlider = (id, out, v) => {
         const el = $(id);
@@ -808,7 +962,9 @@
         if (!state.status || !state.status.started_at) return;
         const now = Date.now() / 1000;
         state.status.uptime = now - state.status.started_at;
-        $("#stat-uptime").textContent = fmtUptime(state.status.uptime);
+        if (!allScannersOff()) {
+          $("#uptime-value").textContent = fmtUptime(state.status.uptime);
+        }
       }, 1000);
     };
 
@@ -931,6 +1087,7 @@
         if (data.type === "snapshot") {
           state.status = data.status;
           state.settings = data.settings;
+          refreshActiveSince(true);
           paint();
           startUptimeTicker();
         } else if (data.type === "status") {
@@ -952,6 +1109,7 @@
       try {
         const snap = await api.fetchState();
         state = snap;
+        refreshActiveSince(true);
         paint();
         startUptimeTicker();
       } catch (_) {}
