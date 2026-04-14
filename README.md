@@ -1,19 +1,31 @@
 # claude-auto-continue-macos
 
-> Automatically clicks "Continue" in the Claude macOS desktop app when tool-use limits pause your session.
+> Automatically clicks "Continue" everywhere Claude paused your session — the native macOS app, claude.ai in any browser, and optionally Claude Code in your terminal. No extension required.
 
-A small, focused Python CLI that watches the native Claude app and presses
-the tool-use-limit **Continue** button for you. Walk away from a long
-agentic session and come back to finished work instead of a paused screen.
+A small, focused Python CLI that watches every place Claude might be
+waiting for you and resumes the session automatically. Walk away from a
+long agentic run and come back to finished work instead of a paused
+screen.
 
 ---
 
 ## What it does
 
-The Claude macOS desktop app will pause long tool-use sessions and ask you
-to click a **Continue** button to proceed. This tool monitors the Claude
-app for that specific pause and clicks Continue for you automatically. It
-only ever clicks in the correct context — it ignores unrelated
+Claude pauses long tool-use sessions and asks you to click **Continue**
+(or press Enter) before it keeps going. This tool watches three places at
+once and resumes whichever one is paused:
+
+- **The native Claude desktop app** — AXPress on the tool-use-limit
+  Continue button.
+- **claude.ai in any browser** — Safari, Chrome, Brave, Arc, Dia, Edge,
+  Opera, Vivaldi, Firefox, and ChatGPT Atlas. Only the claude.ai tab is
+  scanned; other tabs and sites are ignored.
+- **Claude Code CLI** (opt-in) — Warp, iTerm2, Ghostty, Terminal.app, VS
+  Code, Cursor, Windsurf, Hyper, WezTerm, Kitty, and Alacritty. Sends a
+  single Return keystroke only when a narrow tool-use-limit pattern is
+  on screen.
+
+It only ever acts in the correct context — it ignores unrelated
 "Continue" buttons elsewhere in the UI.
 
 ## How it works
@@ -49,11 +61,15 @@ app = AXUIElementCreateApplication(pid)
 AXUIElementSetAttributeValue(app, "AXManualAccessibility", true)
 ```
 
-## Why not the browser extension?
+## Why not a browser extension?
 
-The excellent [`claude-autocontinue`](https://github.com/timothy22000/claude-autocontinue)
-extension handles `claude.ai` in Chrome/Firefox. This tool exists for the
-**native macOS desktop app**, which doesn't run browser extensions.
+Extensions only see one browser at a time and can't touch the native
+desktop app or the terminal. This tool uses the macOS Accessibility API
+instead, which covers every surface a single install and one permission
+grant. The older
+[`claude-autocontinue`](https://github.com/timothy22000/claude-autocontinue)
+Chrome/Firefox extension still works if you prefer that — they're not
+mutually exclusive.
 
 ---
 
@@ -72,14 +88,22 @@ extension handles `claude.ai` in Chrome/Firefox. This tool exists for the
    pip install -r requirements.txt
    ```
 
-3. **Grant Accessibility permission to your terminal**
+3. **Run the one-time setup walkthrough**
+   ```bash
+   claude-auto-continue --setup
+   ```
 
-   Open **System Settings → Privacy & Security → Accessibility**, click the
-   `+`, add your terminal app (Terminal, iTerm, Ghostty, Warp, …), and make
-   sure the toggle is **ON**. Quit and reopen the terminal afterward.
+   This opens System Settings straight to the Accessibility pane, tells
+   you the exact interpreter path to paste in, spins until the toggle
+   flips on, optionally installs the background LaunchAgent, and runs a
+   self-test against the Claude app. The whole thing takes under a
+   minute.
 
-   If you skip this step the tool will detect it and print a step-by-step
-   guide naming your specific terminal app — it won't crash.
+   If you'd rather do it manually: open **System Settings → Privacy &
+   Security → Accessibility**, click the `+`, and add either your
+   terminal app (for one-shot CLI use) or the interpreter at
+   `.venv/bin/python` (for the LaunchAgent). Either path prints below
+   on the first failed run, so you don't need to remember it.
 
 4. **Run it**
    ```bash
@@ -96,9 +120,11 @@ extension handles `claude.ai` in Chrome/Firefox. This tool exists for the
 ## Usage
 
 ```text
-claude-auto-continue [--dry-run] [--interval SECONDS] [--cooldown SECONDS]
+claude-auto-continue [--setup]
+                     [--dry-run] [--interval SECONDS] [--cooldown SECONDS]
                      [--silent] [--no-notifications]
                      [--max-continues N] [--no-log] [--verbose]
+                     [--no-app] [--no-browsers] [--terminals]
                      [--config PATH] [--version]
 ```
 
@@ -106,6 +132,7 @@ claude-auto-continue [--dry-run] [--interval SECONDS] [--cooldown SECONDS]
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--setup` | — | One-time interactive walkthrough: opens System Settings, polls for Accessibility permission, offers LaunchAgent install, runs a self-test. Recommended for first-run. |
 | `--dry-run` | off | Show when it *would* click without actually clicking. Prints `[DRY RUN] Would have clicked Continue` so you can build trust before letting it touch your UI. |
 | `--interval SECONDS` | `3` | Polling interval in seconds. Range: **1 – 30**. |
 | `--cooldown SECONDS` | `5` | Minimum wait between clicks to prevent rapid double-clicks if the UI is slow to update. |
@@ -114,6 +141,9 @@ claude-auto-continue [--dry-run] [--interval SECONDS] [--cooldown SECONDS]
 | `--max-continues N` | unlimited | Stop after N auto-continues and exit cleanly. |
 | `--no-log` | off | Don't write to `~/.claude-auto-continue/activity.log`. |
 | `--verbose` | off | Print AX tree scans and idle heartbeats. Use this to debug if Claude changes the button text. |
+| `--no-app` | off | Don't scan the native Claude desktop app. |
+| `--no-browsers` | off | Don't scan browsers for claude.ai tabs. |
+| `--terminals` | off | **Also** scan terminal apps for Claude Code CLI pauses. Opt-in because this sends Return keystrokes. |
 | `--config PATH` | `~/.claude-auto-continue/config.toml` | Use a custom TOML config file. |
 | `--version` | — | Print version and exit. |
 | `--help` | — | Full help menu. |
@@ -121,8 +151,17 @@ claude-auto-continue [--dry-run] [--interval SECONDS] [--cooldown SECONDS]
 ### Common recipes
 
 ```bash
-# Basic — just run it.
+# Basic — just run it. Watches the desktop app + claude.ai in browsers.
 claude-auto-continue
+
+# First time? Get a guided setup wizard.
+claude-auto-continue --setup
+
+# Cover everything, including Claude Code CLI in your terminal.
+claude-auto-continue --terminals
+
+# Only the native desktop app.
+claude-auto-continue --no-browsers
 
 # Trust-building dry run: show what would happen without clicking.
 claude-auto-continue --dry-run
@@ -195,14 +234,26 @@ for any flag. CLI arguments always win.
 
 ```toml
 # ~/.claude-auto-continue/config.toml
-interval       = 3
-cooldown       = 5
-silent         = false
-notifications  = true
-max_continues  = 0       # 0 = unlimited
-log            = true
-verbose        = false
-dry_run        = false
+interval        = 3
+cooldown        = 5
+silent          = false
+notifications   = true
+max_continues   = 0       # 0 = unlimited
+log             = true
+verbose         = false
+dry_run         = false
+
+# Scan targets
+scan_app        = true    # native Claude desktop app
+scan_browsers   = true    # claude.ai in any running browser
+scan_terminals  = false   # opt in — sends Return keystrokes
+
+# Extra text patterns that identify a Claude Code CLI pause.
+# Matched as case-insensitive substrings against the focused terminal.
+terminal_patterns = [
+    # "press enter to resume",
+    # "session paused, press any key",
+]
 ```
 
 Requires Python 3.11+ (stdlib `tomllib`) or the `tomli` package on older
@@ -221,9 +272,13 @@ exactly what that means and what it does.
 - With that permission, it can **only** read UI element metadata —
   button labels, window titles, roles. It **cannot** read your
   conversation content, keystrokes, clipboard, files, or anything else.
-- It performs **exactly one** action: the `AXPress` accessibility action
-  on a button whose label looks like "Continue" and whose window
-  contains tool-use-limit text. That's it.
+- It performs at most two kinds of action, and only when a narrow
+  tool-use-limit context is confirmed:
+  - `AXPress` on a Continue-looking button (native app, or a claude.ai
+    tab in a browser).
+  - A single Return keystroke sent to a terminal process, **opt-in via
+    `--terminals`**, only when an unambiguous Claude Code pause
+    pattern is visible in that terminal's focused window.
 - It makes **zero** network requests. It never phones home. It has no
   analytics, no telemetry, no update pings.
 - It is fully open source. Read every file yourself — the whole thing is

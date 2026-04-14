@@ -1,17 +1,16 @@
 """
 The polling loop.
 
-Every `interval` seconds:
+We scan three kinds of targets every ``interval`` seconds and press
+Continue on whichever one is paused:
 
-1. Find the Claude app. If not running, set state=Waiting and keep polling.
-2. If the pid changed since last scan, re-enable AXManualAccessibility.
-3. Scan each window for a Continue button inside tool-use-limit context.
-4. If a match is found and we're outside the cooldown window, press it
-   (unless --dry-run), notify, log, and arm the cooldown.
-5. Handle any AX error by logging and continuing — never crash the loop.
+1. The native Claude desktop app  (AXPress on a Continue button).
+2. Any running browser showing a claude.ai tab  (AXPress, same as above).
+3. Any frontmost terminal running Claude Code  (synthesised Return).
 
-The loop is driven by cooperative checks against a ``stop`` callable so
-the CLI signal handler can shut us down cleanly.
+Each hit goes through the same cooldown so a browser click and an app
+click can't double-fire within the same second. Errors in any one
+subsystem never crash the loop — they log and we continue.
 """
 
 from __future__ import annotations
@@ -21,6 +20,8 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from . import accessibility as ax
+from . import browser as br
+from . import terminal as term
 from .config import Settings
 from .logger import ActivityLog
 from .notifications import Notifier
@@ -42,6 +43,7 @@ class Monitor:
         self._current_app: Optional[ax.ClaudeApp] = None
         self._current_pid: Optional[int] = None
         self._last_click_at: float = 0.0
+        self._seen_browser_pids: set[int] = set()
 
     # ------------------------------------------------------------------
 
@@ -60,7 +62,6 @@ class Monitor:
 
             ui.refresh()
 
-            # Cap termination condition.
             if s.max_continues and ui.status.total_continues >= s.max_continues:
                 ui.warn(
                     f"reached --max-continues cap of {s.max_continues}; "
@@ -73,6 +74,22 @@ class Monitor:
     # ------------------------------------------------------------------
 
     def _tick(self) -> None:
+        s = self.ctx.settings
+
+        app_hit = self._scan_app() if s.scan_app else False
+        if app_hit:
+            return
+
+        if s.scan_browsers:
+            if self._scan_browsers():
+                return
+
+        if s.scan_terminals:
+            self._scan_terminals()
+
+    # ---- target: native Claude desktop app ---------------------------
+
+    def _scan_app(self) -> bool:
         ui = self.ctx.ui
         app = ax.find_claude_app()
 
@@ -85,9 +102,8 @@ class Monitor:
             ui.status.ax_enabled = False
             ui.status.state = "Waiting for Claude"
             ui.status.state_style = "yellow"
-            return
+            return False
 
-        # Fresh launch, or pid changed since last scan? Re-enable AX.
         if self._current_pid != app.pid:
             first_time = self._current_pid is None
             self._current_app = app
@@ -97,37 +113,139 @@ class Monitor:
             ui.status.state_style = "green"
             ok = ax.enable_manual_accessibility(app)
             ui.status.ax_enabled = ok
-            if first_time:
-                ui.info(f"Claude detected (pid {app.pid}) — AXManualAccessibility "
-                        f"{'enabled' if ok else 'could not be enabled'}")
-            else:
-                ui.info(f"Claude restarted (pid {app.pid}) — re-enabled AX "
-                        f"{'ok' if ok else 'FAILED'}")
+            verb = "detected" if first_time else "restarted"
+            ui.info(
+                f"Claude {verb} (pid {app.pid}) — AXManualAccessibility "
+                f"{'enabled' if ok else 'FAILED'}"
+            )
 
         verbose_cb = ui.debug if ui.verbose else None
         candidates = ax.find_continue_buttons(app, verbose_cb=verbose_cb)
-
         if not candidates:
             ui.heartbeat(f"tick — pid={app.pid}, no Continue button")
-            return
+            return False
 
-        # Cooldown gate — if we just clicked, don't fire again.
-        now = time.monotonic()
-        cooldown = self.ctx.settings.cooldown
-        if cooldown > 0 and (now - self._last_click_at) < cooldown:
-            remaining = cooldown - (now - self._last_click_at)
-            ui.heartbeat(
-                f"button found but cooldown holds ({remaining:.1f}s remaining)"
-            )
-            return
+        if self._in_cooldown(ui):
+            return False
 
-        # Click the first candidate (there's typically only one at a time).
         target = candidates[0]
-        self._handle_click(target)
+        self._handle_ax_click(
+            element=target.element,
+            label=target.label,
+            source=f"Claude app window {target.window_index}",
+        )
+        return True
 
-    # ------------------------------------------------------------------
+    # ---- target: browsers (claude.ai tab) ----------------------------
 
-    def _handle_click(self, candidate: ax.ButtonCandidate) -> None:
+    def _scan_browsers(self) -> bool:
+        ui = self.ctx.ui
+        browsers = br.find_browsers()
+
+        # Seed AX-enhanced mode once per pid — saves a noisy write on every tick.
+        current_pids = {b.pid for b in browsers}
+        for b in browsers:
+            if b.pid not in self._seen_browser_pids:
+                ok = br.enable_enhanced_ax(b)
+                if ui.verbose:
+                    ui.debug(
+                        f"browser {b.name} (pid {b.pid}) AX enable={'ok' if ok else 'fail'}"
+                    )
+                self._seen_browser_pids.add(b.pid)
+        # Drop pids that have quit so a relaunched browser gets re-seeded.
+        self._seen_browser_pids &= current_pids
+
+        verbose_cb = ui.debug if ui.verbose else None
+        for b in browsers:
+            try:
+                candidates = br.find_browser_continue_buttons(
+                    b, verbose_cb=verbose_cb
+                )
+            except Exception as exc:
+                ui.error(f"browser scan error ({b.name}): {exc!r}")
+                continue
+            if not candidates:
+                continue
+            if self._in_cooldown(ui):
+                return True
+            target = candidates[0]
+            self._handle_ax_click(
+                element=target.element,
+                label=target.label,
+                source=f"{target.browser_name} — {target.url}",
+            )
+            return True
+        return False
+
+    # ---- target: terminals (Claude Code CLI) -------------------------
+
+    def _scan_terminals(self) -> bool:
+        ui = self.ctx.ui
+        s = self.ctx.settings
+        verbose_cb = ui.debug if ui.verbose else None
+        try:
+            candidates = term.find_terminal_candidates(
+                extra_patterns=s.terminal_patterns or (),
+                verbose_cb=verbose_cb,
+            )
+        except Exception as exc:
+            ui.error(f"terminal scan error: {exc!r}")
+            return False
+
+        if not candidates:
+            return False
+
+        if self._in_cooldown(ui):
+            return True
+
+        target = candidates[0]
+        source = (
+            f"{target.terminal_name} — matched {target.matched_pattern!r}"
+        )
+
+        if s.dry_run:
+            ui.status.total_continues += 1
+            ui.status.last_continue_at = time.monotonic()
+            self._last_click_at = time.monotonic()
+            ui.warn(f"[DRY RUN] Would have sent Return to {source}")
+            self.ctx.log.dry_run_hit(ui.status.total_continues)
+            return True
+
+        ok = term.send_return_to(target.terminal_pid)
+        if not ok:
+            ui.error(f"failed to send Return to {source}; will retry next tick")
+            return True
+
+        ui.status.total_continues += 1
+        ui.status.last_continue_at = time.monotonic()
+        self._last_click_at = time.monotonic()
+        total = ui.status.total_continues
+        ui.success(f"auto-continued #{total} — sent Return to {source}")
+        self.ctx.log.auto_continue(total)
+        self.ctx.notifier.announce_continue(total, label=target.matched_pattern)
+        return True
+
+    # ---- shared helpers ----------------------------------------------
+
+    def _in_cooldown(self, ui: TerminalUI) -> bool:
+        cooldown = self.ctx.settings.cooldown
+        if cooldown <= 0:
+            return False
+        elapsed = time.monotonic() - self._last_click_at
+        if elapsed < cooldown:
+            ui.heartbeat(
+                f"candidate found but cooldown holds ({cooldown - elapsed:.1f}s)"
+            )
+            return True
+        return False
+
+    def _handle_ax_click(
+        self,
+        *,
+        element,
+        label: str,
+        source: str,
+    ) -> None:
         ui = self.ctx.ui
         settings = self.ctx.settings
 
@@ -135,28 +253,22 @@ class Monitor:
             ui.status.total_continues += 1
             ui.status.last_continue_at = time.monotonic()
             self._last_click_at = time.monotonic()
-            ui.warn(
-                f"[DRY RUN] Would have clicked {candidate.label!r} "
-                f"(window {candidate.window_index})"
-            )
+            ui.warn(f"[DRY RUN] Would have clicked {label!r} in {source}")
             self.ctx.log.dry_run_hit(ui.status.total_continues)
             return
 
-        ok = ax.press(candidate.element)
+        ok = ax.press(element)
         if not ok:
-            ui.error(f"AXPress failed on {candidate.label!r}; will retry next tick")
+            ui.error(f"AXPress failed on {label!r} in {source}; will retry")
             return
 
         ui.status.total_continues += 1
         ui.status.last_continue_at = time.monotonic()
         self._last_click_at = time.monotonic()
         total = ui.status.total_continues
-        ui.success(
-            f"auto-continued #{total} — pressed {candidate.label!r} "
-            f"in window {candidate.window_index}"
-        )
+        ui.success(f"auto-continued #{total} — pressed {label!r} in {source}")
         self.ctx.log.auto_continue(total)
-        self.ctx.notifier.announce_continue(total, label=candidate.label)
+        self.ctx.notifier.announce_continue(total, label=label)
 
     # ------------------------------------------------------------------
 

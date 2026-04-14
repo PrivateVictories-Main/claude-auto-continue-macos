@@ -23,10 +23,13 @@ from .ui import TerminalUI
 EXAMPLES = """\
 examples:
   claude-auto-continue                          # default 3-second polling
+  claude-auto-continue --setup                  # first-run walkthrough
   claude-auto-continue --dry-run                # test without clicking
   claude-auto-continue --silent --no-notifications
   claude-auto-continue --interval 5             # slower polling
   claude-auto-continue --max-continues 10       # stop after 10 continues
+  claude-auto-continue --no-browsers            # desktop app only
+  claude-auto-continue --terminals              # also watch Claude Code CLI
   claude-auto-continue --verbose                # show tree scans
 
 config file (optional): ~/.claude-auto-continue/config.toml
@@ -105,6 +108,41 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"Path to TOML config (default: {CONFIG_PATH}).",
     )
     parser.add_argument(
+        "--setup",
+        action="store_true",
+        default=False,
+        help=(
+            "Run the interactive first-run walkthrough (grants Accessibility "
+            "permission, optionally installs the background service, and "
+            "self-tests against the Claude app)."
+        ),
+    )
+    parser.add_argument(
+        "--no-app",
+        dest="scan_app",
+        action="store_false",
+        default=None,
+        help="Don't scan the native Claude desktop app.",
+    )
+    parser.add_argument(
+        "--no-browsers",
+        dest="scan_browsers",
+        action="store_false",
+        default=None,
+        help="Don't scan browsers for claude.ai tabs.",
+    )
+    parser.add_argument(
+        "--terminals",
+        dest="scan_terminals",
+        action="store_true",
+        default=None,
+        help=(
+            "Also scan terminal apps (Warp, iTerm, Ghostty, Terminal, etc.) "
+            "for Claude Code pauses. Disabled by default because it sends "
+            "Return keystrokes."
+        ),
+    )
+    parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s {__version__}",
@@ -136,12 +174,20 @@ def _args_to_dict(args: argparse.Namespace) -> dict:
         "max_continues": args.max_continues,
         "log": args.log,
         "verbose": args.verbose,
+        "scan_app": args.scan_app,
+        "scan_browsers": args.scan_browsers,
+        "scan_terminals": args.scan_terminals,
     }
 
 
 def main(argv: Optional[list[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    # --setup short-circuits everything else and runs the walkthrough.
+    if args.setup:
+        from .setup import run_setup
+        return run_setup()
 
     # Load TOML first so CLI can override it.
     file_values = load_file(args.config) if args.config else load_file()
@@ -164,10 +210,16 @@ def main(argv: Optional[list[str]] = None) -> int:
             )
             ui.console.print()
             ui.console.print(setup_instructions(terminal))
+            ui.console.print()
+            ui.console.print(
+                "[bold cyan]Tip:[/bold cyan] run "
+                "[bold]claude-auto-continue --setup[/bold] for an interactive "
+                "walkthrough that opens System Settings for you and polls "
+                "until the toggle flips on."
+            )
         else:
             # Headless (launchd / pipe / CI): one concise line so log stays
             # readable even when KeepAlive restarts us every 10 seconds.
-            import sys
             python_path = sys.executable
             ui.error(
                 "Accessibility permission missing. Grant it to the Python "

@@ -41,6 +41,10 @@ class Settings:
     log: bool = True
     verbose: bool = False
     dry_run: bool = False
+    scan_app: bool = True
+    scan_browsers: bool = True
+    scan_terminals: bool = False
+    terminal_patterns: tuple[str, ...] = ()
 
     def validate(self) -> None:
         if not (1.0 <= self.interval <= 30.0):
@@ -110,6 +114,10 @@ def merge(cli_values: dict[str, Any], file_values: dict[str, Any]) -> Settings:
     for key, value in cli_values.items():
         if key in _FIELD_NAMES and value is not None:
             merged[key] = value
+
+    # Coerce list values from TOML into the tuple types on Settings.
+    if isinstance(merged.get("terminal_patterns"), list):
+        merged["terminal_patterns"] = tuple(merged["terminal_patterns"])
 
     settings = Settings(**merged)
     settings.validate()
