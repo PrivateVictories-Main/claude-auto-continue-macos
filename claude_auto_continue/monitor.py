@@ -45,6 +45,12 @@ class Monitor:
         self._current_pid: Optional[int] = None
         self._last_click_at: float = 0.0
         self._seen_browser_pids: set[int] = set()
+        # When True, the next sleep collapses to the fast follow-up
+        # interval — used to catch back-to-back pauses without waiting a
+        # full polling interval and to re-scan immediately after Claude
+        # restarts (the freshly-launched AX tree may not be populated on
+        # the very same tick we detect the new pid).
+        self._fast_followup: bool = False
 
     # ---- shared-state helpers (dashboard) -----------------------------
 
@@ -111,7 +117,14 @@ class Monitor:
                 return
 
             # Live-reload settings each iteration — dashboard mutations apply.
-            self._sleep(self.ctx.settings.interval)
+            # After a click or a Claude restart, drop to a tight 0.4s
+            # follow-up so back-to-back pauses or freshly-loaded AX trees
+            # are caught fast instead of waiting a full poll interval.
+            if self._fast_followup:
+                self._fast_followup = False
+                self._sleep(0.4)
+            else:
+                self._sleep(self.ctx.settings.interval)
 
     # ------------------------------------------------------------------
 
@@ -164,6 +177,10 @@ class Monitor:
             )
             ui.info(msg)
             self._emit("info", msg)
+            # The freshly-launched Electron tree often isn't fully
+            # populated yet — schedule a fast follow-up so we don't wait
+            # a whole interval before the first useful scan.
+            self._fast_followup = True
 
         verbose_cb = ui.debug if ui.verbose else None
         candidates = ax.find_continue_buttons(app, verbose_cb=verbose_cb)
@@ -275,6 +292,7 @@ class Monitor:
         self._emit("success", msg)
         self.ctx.log.auto_continue(total)
         self.ctx.notifier.announce_continue(total, label=target.matched_pattern)
+        self._fast_followup = True
         return True
 
     # ---- shared helpers ----------------------------------------------
@@ -327,6 +345,9 @@ class Monitor:
         self._emit("success", msg)
         self.ctx.log.auto_continue(total)
         self.ctx.notifier.announce_continue(total, label=label)
+        # Some flows surface a second Continue immediately after the
+        # first (consecutive tool-use limits). Re-scan fast.
+        self._fast_followup = True
 
     # ------------------------------------------------------------------
 

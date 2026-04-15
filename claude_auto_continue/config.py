@@ -5,7 +5,7 @@ All CLI flags can be defaulted here. CLI arguments always win.
 
 Example config.toml:
 
-    interval = 3
+    interval = 1.5
     silent = false
     notifications = true
     max_continues = 0          # 0 = unlimited
@@ -33,7 +33,7 @@ CONFIG_PATH = DEFAULT_HOME / "config.toml"
 
 @dataclass
 class Settings:
-    interval: float = 3.0
+    interval: float = 1.5
     cooldown: float = 5.0
     silent: bool = False
     notifications: bool = True
@@ -47,9 +47,9 @@ class Settings:
     terminal_patterns: tuple[str, ...] = ()
 
     def validate(self) -> None:
-        if not (1.0 <= self.interval <= 30.0):
+        if not (0.5 <= self.interval <= 30.0):
             raise ValueError(
-                f"--interval must be between 1 and 30 seconds (got {self.interval})"
+                f"--interval must be between 0.5 and 30 seconds (got {self.interval})"
             )
         if self.cooldown < 0:
             raise ValueError(f"cooldown must be >= 0 (got {self.cooldown})")

@@ -142,7 +142,7 @@ claude-auto-continue [--setup]
 |------|---------|-------------|
 | `--setup` | — | One-time interactive walkthrough: opens System Settings, polls for Accessibility permission, offers LaunchAgent install, runs a self-test. Recommended for first-run. |
 | `--dry-run` | off | Show when it *would* click without actually clicking. Prints `[DRY RUN] Would have clicked Continue` so you can build trust before letting it touch your UI. |
-| `--interval SECONDS` | `3` | Polling interval in seconds. Range: **1 – 30**. |
+| `--interval SECONDS` | `1.5` | Polling interval in seconds. Range: **0.5 – 30**. After each click or Claude restart, the next scan runs in 0.4s regardless. |
 | `--cooldown SECONDS` | `5` | Minimum wait between clicks to prevent rapid double-clicks if the UI is slow to update. |
 | `--silent` | off | Disable the notification sound on auto-continue. |
 | `--no-notifications` | off | Disable macOS Notification Center alerts. |
