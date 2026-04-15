@@ -48,8 +48,6 @@ cat > "$PLIST" <<EOF
         <string>-u</string>
         <string>-m</string>
         <string>claude_auto_continue</string>
-        <string>--interval</string>
-        <string>3</string>
     </array>
 
     <key>WorkingDirectory</key>
