@@ -45,6 +45,10 @@ class Settings:
     scan_browsers: bool = True
     scan_terminals: bool = False
     terminal_patterns: tuple[str, ...] = ()
+    # User-overridable button labels and context keywords — merged with
+    # the built-in lists so new labels work without a code update.
+    extra_continue_labels: tuple[str, ...] = ()
+    extra_context_keywords: tuple[str, ...] = ()
 
     def validate(self) -> None:
         if not (0.5 <= self.interval <= 30.0):
@@ -116,8 +120,10 @@ def merge(cli_values: dict[str, Any], file_values: dict[str, Any]) -> Settings:
             merged[key] = value
 
     # Coerce list values from TOML into the tuple types on Settings.
-    if isinstance(merged.get("terminal_patterns"), list):
-        merged["terminal_patterns"] = tuple(merged["terminal_patterns"])
+    for tuple_key in ("terminal_patterns", "extra_continue_labels",
+                      "extra_context_keywords"):
+        if isinstance(merged.get(tuple_key), list):
+            merged[tuple_key] = tuple(merged[tuple_key])
 
     settings = Settings(**merged)
     settings.validate()

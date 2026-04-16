@@ -15,6 +15,7 @@ subsystem never crash the loop — they log and we continue.
 
 from __future__ import annotations
 
+import sys
 import time
 from dataclasses import dataclass
 from typing import Callable, Optional
@@ -45,12 +46,24 @@ class Monitor:
         self._current_pid: Optional[int] = None
         self._last_click_at: float = 0.0
         self._seen_browser_pids: set[int] = set()
-        # When True, the next sleep collapses to the fast follow-up
-        # interval — used to catch back-to-back pauses without waiting a
-        # full polling interval and to re-scan immediately after Claude
-        # restarts (the freshly-launched AX tree may not be populated on
-        # the very same tick we detect the new pid).
         self._fast_followup: bool = False
+        self._tick_count: int = 0
+
+    # ---- diagnostics (written directly to stderr so launchd captures) --
+
+    def _diag(self, msg: str) -> None:
+        """Low-level diagnostic line that bypasses Rich and the event bus.
+
+        Goes straight to stderr (captured by launchd.err.log) so we can
+        see what the loop is actually doing even when everything else is
+        silent.
+        """
+        try:
+            ts = time.strftime("%H:%M:%S")
+            print(f"[DIAG {ts}] tick#{self._tick_count} {msg}",
+                  file=sys.stderr, flush=True)
+        except Exception:
+            pass
 
     # ---- shared-state helpers (dashboard) -----------------------------
 
@@ -98,11 +111,13 @@ class Monitor:
         self._sync_status()
 
         while not self.ctx.stop():
+            self._tick_count += 1
             try:
                 self._tick()
             except Exception as exc:  # never crash the loop
                 ui.error(f"scan error: {exc!r}")
                 self._emit("error", f"scan error: {exc!r}")
+                self._diag(f"EXCEPTION in _tick: {exc!r}")
 
             ui.refresh()
             self._sync_status()
@@ -153,6 +168,7 @@ class Monitor:
                 msg = "Claude app closed — waiting for it to return"
                 ui.warn(msg)
                 self._emit("warn", msg)
+                self._diag("Claude app GONE")
             self._current_app = None
             self._current_pid = None
             ui.status.claude_detected = False
@@ -163,6 +179,7 @@ class Monitor:
 
         if self._current_pid != app.pid:
             first_time = self._current_pid is None
+            old_pid = self._current_pid
             self._current_app = app
             self._current_pid = app.pid
             ui.status.claude_detected = True
@@ -177,21 +194,36 @@ class Monitor:
             )
             ui.info(msg)
             self._emit("info", msg)
-            # The freshly-launched Electron tree often isn't fully
-            # populated yet — schedule a fast follow-up so we don't wait
-            # a whole interval before the first useful scan.
+            self._diag(f"pid change {old_pid}->{app.pid} AX={ok}")
             self._fast_followup = True
 
-        verbose_cb = ui.debug if ui.verbose else None
-        candidates = ax.find_continue_buttons(app, verbose_cb=verbose_cb)
+        verbose_cb = ui.debug if self.ctx.settings.verbose else None
+        # The Claude app IS the context — no need to require tool-use-
+        # limit keywords. This makes detection immune to Anthropic
+        # rewording the limit text in future updates.
+        candidates = ax.find_continue_buttons(
+            app,
+            verbose_cb=verbose_cb,
+            require_context=False,
+        )
+
+        if candidates or self._tick_count % 100 == 0:
+            n_wins = len(ax.get_windows(app))
+            self._diag(
+                f"scan pid={app.pid} wins={n_wins} "
+                f"cands={len(candidates)}"
+            )
+
         if not candidates:
             ui.heartbeat(f"tick — pid={app.pid}, no Continue button")
             return False
 
         if self._in_cooldown(ui):
+            self._diag("candidate found but COOLDOWN active")
             return False
 
         target = candidates[0]
+        self._diag(f"CLICKING label={target.label!r}")
         self._handle_ax_click(
             element=target.element,
             label=target.label,
