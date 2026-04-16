@@ -207,7 +207,7 @@ class Monitor:
             require_context=False,
         )
 
-        if candidates or self._tick_count % 100 == 0:
+        if candidates or self._tick_count % 20 == 0:
             n_wins = len(ax.get_windows(app))
             self._diag(
                 f"scan pid={app.pid} wins={n_wins} "
