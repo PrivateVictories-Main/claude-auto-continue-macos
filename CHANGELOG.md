@@ -2,6 +2,20 @@
 
 All notable changes to claude-auto-continue are documented here.
 
+## [0.7.2] - 2026-04-17
+
+### Fixed
+- Dashboard: Content-Length validation now rejects negative and non-numeric values
+- Dashboard: CORS origin matching expanded to include `localhost` and port variants
+- Dashboard: `_serve_html` catches `PermissionError`/`OSError`, not just `FileNotFoundError`
+
+### Improved
+- Terminal scanner: regex patterns compiled once via `lru_cache` instead of every tick
+- Dashboard: Content-Security-Policy header on HTML responses
+- Dashboard: aria-live regions on live-updating stats for screen readers
+- Dashboard: toggle cards are keyboard-accessible (`role="switch"`, `tabindex`, Enter/Space)
+- Monitor: replaced `# type: ignore` on `RemotePatterns` with proper `Optional` annotation
+
 ## [0.7.1] - 2026-04-17
 
 ### Added

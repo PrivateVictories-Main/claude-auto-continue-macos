@@ -642,13 +642,13 @@
         </div>
         <div class="value">
           <span class="state-orb" aria-hidden="true"></span>
-          <span id="stat-state">…</span>
+          <span id="stat-state" aria-live="polite">…</span>
         </div>
         <div class="sub" id="stat-state-sub">—</div>
       </div>
       <div class="card stat primary">
         <div class="label">Auto-continues</div>
-        <div class="value" id="stat-continues">0</div>
+        <div class="value" id="stat-continues" aria-live="polite" aria-atomic="true">0</div>
         <div class="sub" id="stat-last">none yet</div>
       </div>
     </section>
@@ -656,7 +656,7 @@
     <!-- Scan targets -->
     <div class="section-title">Scan targets</div>
     <section class="toggles" id="toggles">
-      <div class="card toggle-card" data-target="scan_app">
+      <div class="card toggle-card" data-target="scan_app" role="switch" tabindex="0" aria-checked="false">
         <div class="tc-head">
           <div class="tc-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -672,7 +672,7 @@
         </div>
       </div>
 
-      <div class="card toggle-card" data-target="scan_browsers">
+      <div class="card toggle-card" data-target="scan_browsers" role="switch" tabindex="0" aria-checked="false">
         <div class="tc-head">
           <div class="tc-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -688,7 +688,7 @@
         </div>
       </div>
 
-      <div class="card toggle-card" data-target="scan_terminals">
+      <div class="card toggle-card" data-target="scan_terminals" role="switch" tabindex="0" aria-checked="false">
         <div class="tc-head">
           <div class="tc-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -932,7 +932,9 @@
       // toggle cards
       $$(".toggle-card").forEach((card) => {
         const key = card.dataset.target;
-        card.classList.toggle("on", !!cfg[key]);
+        const on = !!cfg[key];
+        card.classList.toggle("on", on);
+        card.setAttribute("aria-checked", String(on));
       });
       // Re-anchor the active-since timer if the paused/active state changed.
       refreshActiveSince();
@@ -999,13 +1001,17 @@
 
     // ---- wiring ----------------------------------------------------
     $$(".toggle-card").forEach((card) => {
-      card.addEventListener("click", () => {
+      const toggle = () => {
         const key = card.dataset.target;
         const next = !state.settings[key];
         state.settings[key] = next;
         paintSettings();
         sendPatch({ [key]: next },
           next ? `${labelFor(key)} on` : `${labelFor(key)} off`);
+      };
+      card.addEventListener("click", toggle);
+      card.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
       });
     });
 

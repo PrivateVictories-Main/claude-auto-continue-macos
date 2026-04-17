@@ -200,7 +200,12 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def _cors_headers(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "http://127.0.0.1")
+        origin = self.headers.get("Origin", "")
+        allowed = {"http://127.0.0.1", "http://localhost", "http://127.0.0.1:8787", "http://localhost:8787"}
+        if origin in allowed:
+            self.send_header("Access-Control-Allow-Origin", origin)
+        else:
+            self.send_header("Access-Control-Allow-Origin", "http://127.0.0.1")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
@@ -223,8 +228,12 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_error(404, "not found")
             return
 
-        length = int(self.headers.get("Content-Length") or 0)
-        if length > 65_536:
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except (ValueError, TypeError):
+            self.send_error(400, "invalid Content-Length")
+            return
+        if not (0 <= length <= 65_536):
             self.send_error(413, "request body too large (64KB max)")
             return
         raw = self.rfile.read(length) if length else b""
@@ -253,8 +262,8 @@ class _Handler(BaseHTTPRequestHandler):
     def _serve_html(self) -> None:
         try:
             text = HTML_PATH.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            self.send_error(500, "dashboard_ui.html missing")
+        except (FileNotFoundError, PermissionError, OSError):
+            self.send_error(500, "dashboard_ui.html unavailable")
             return
         from . import __version__ as pkg_version
         text = text.replace('id="version">v…</span>',
@@ -264,6 +273,10 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header(
+            "Content-Security-Policy",
+            "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'",
+        )
         self.end_headers()
         self.wfile.write(body)
 
