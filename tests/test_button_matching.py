@@ -45,6 +45,17 @@ class TestPrefixMatching:
         assert not _looks_like_continue("Continue " + "x" * 50)
 
     @pytest.mark.parametrize("label", [
+        "Continue?",
+        "Continue!",
+        "Continue...",
+        "Resume - ready",
+        "Proceed: next step",
+        "Continue, please",
+    ])
+    def test_punctuation_after_prefix(self, label):
+        assert _looks_like_continue(label)
+
+    @pytest.mark.parametrize("label", [
         "continue",
         "Continue",
         "CONTINUE",
@@ -78,6 +89,13 @@ class TestFalsePositives:
         "New chat",
         "",
         "   ",
+        # File names starting with "resume" or "continue" — must NOT match
+        "RESUME_MAIN_NEW.zip",
+        "resume_v2.pdf",
+        "continued_fraction.py",
+        "proceedings.docx",
+        "ContinueButton.tsx",
+        "resume2024.doc",
     ])
     def test_non_continue_labels_rejected(self, label):
         assert not _looks_like_continue(label)
