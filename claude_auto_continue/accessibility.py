@@ -269,9 +269,12 @@ def _looks_like_continue(label: str, extra_labels: tuple[str, ...] = ()) -> bool
     all_labels = CONTINUE_LABELS + extra_labels
     if lower in all_labels:
         return True
+    _WORD_BREAK = frozenset(" ,-.?!:;")
     for prefix in ("continue", "resume", "proceed", "keep going"):
         if lower.startswith(prefix) and len(lower) <= 50:
-            return True
+            tail = lower[len(prefix):]
+            if not tail or tail[0] in _WORD_BREAK:
+                return True
     return False
 
 
