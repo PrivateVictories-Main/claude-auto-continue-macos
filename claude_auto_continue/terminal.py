@@ -45,6 +45,7 @@ try:
         CGEventPost,
         kCGHIDEventTap,
     )
+
     _HAVE_CGEVENT = True
 except Exception:  # pragma: no cover - missing Quartz
     _HAVE_CGEVENT = False
@@ -52,34 +53,35 @@ except Exception:  # pragma: no cover - missing Quartz
 from . import accessibility as ax
 from . import browser as br
 
-
 # Apps that must never be treated as a terminal. Two reasons to exclude:
 # (a) they have their own scanner elsewhere (Claude desktop app,
 #     browsers), so double-matching would be wasteful and potentially
 #     send Return into a browser window;
 # (b) they're system UI that should never receive synthesized Return
 #     keystrokes (Finder, Dock, Spotlight, System Settings, etc).
-FRONTMOST_EXCLUDE_BUNDLES = frozenset({
-    # Claude desktop app — own scanner.
-    "com.anthropic.claudefordesktop",
-    "com.anthropic.claudedesktop",
-    "com.anthropic.claude",
-    # All known browsers — own scanner.
-    *(b.lower() for b in br.BROWSER_BUNDLE_IDS),
-    # System UI.
-    "com.apple.finder",
-    "com.apple.dock",
-    "com.apple.controlcenter",
-    "com.apple.systempreferences",
-    "com.apple.systemuiserver",
-    "com.apple.windowmanager",
-    "com.apple.loginwindow",
-    "com.apple.spotlight",
-    "com.apple.notificationcenterui",
-    "com.apple.screensaver.engine",
-    "com.apple.preview",
-    "com.apple.screenshot.launcher",
-})
+FRONTMOST_EXCLUDE_BUNDLES = frozenset(
+    {
+        # Claude desktop app — own scanner.
+        "com.anthropic.claudefordesktop",
+        "com.anthropic.claudedesktop",
+        "com.anthropic.claude",
+        # All known browsers — own scanner.
+        *(b.lower() for b in br.BROWSER_BUNDLE_IDS),
+        # System UI.
+        "com.apple.finder",
+        "com.apple.dock",
+        "com.apple.controlcenter",
+        "com.apple.systempreferences",
+        "com.apple.systemuiserver",
+        "com.apple.windowmanager",
+        "com.apple.loginwindow",
+        "com.apple.spotlight",
+        "com.apple.notificationcenterui",
+        "com.apple.screensaver.engine",
+        "com.apple.preview",
+        "com.apple.screenshot.launcher",
+    }
+)
 
 
 # Re-export the browser heuristic so a future fork added in one place
@@ -142,6 +144,7 @@ class TerminalApp:
 @dataclass
 class TerminalCandidate:
     """A Claude-Code pause detected in a frontmost terminal window."""
+
     terminal_name: str
     terminal_pid: int
     bundle_id: str
@@ -181,12 +184,14 @@ def find_terminals() -> list[TerminalApp]:
 
     pid = int(app.processIdentifier())
     element = AXUIElementCreateApplication(pid)
-    return [TerminalApp(
-        pid=pid,
-        bundle_id=app.bundleIdentifier() or "",
-        name=app.localizedName() or "terminal",
-        element=element,
-    )]
+    return [
+        TerminalApp(
+            pid=pid,
+            bundle_id=app.bundleIdentifier() or "",
+            name=app.localizedName() or "terminal",
+            element=element,
+        )
+    ]
 
 
 def _focused_window(app: TerminalApp):
@@ -276,12 +281,14 @@ def find_terminal_candidates(
 
         matched = _match_pattern(text, patterns)
         if matched:
-            matches.append(TerminalCandidate(
-                terminal_name=term.name,
-                terminal_pid=term.pid,
-                bundle_id=term.bundle_id,
-                matched_pattern=matched,
-            ))
+            matches.append(
+                TerminalCandidate(
+                    terminal_name=term.name,
+                    terminal_pid=term.pid,
+                    bundle_id=term.bundle_id,
+                    matched_pattern=matched,
+                )
+            )
     return matches
 
 

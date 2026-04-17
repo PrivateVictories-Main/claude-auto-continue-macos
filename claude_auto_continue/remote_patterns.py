@@ -13,10 +13,8 @@ so subsequent starts within the TTL don't hit the network at all.
 from __future__ import annotations
 
 import json
-import sys
 import time
-from dataclasses import dataclass, field
-from pathlib import Path
+from dataclasses import dataclass
 from typing import Any, Optional
 from urllib.error import URLError
 from urllib.request import Request, urlopen
@@ -80,9 +78,7 @@ def _write_cache(data: dict[str, Any]) -> None:
     try:
         DEFAULT_HOME.mkdir(parents=True, exist_ok=True)
         data["_fetched_at"] = time.time()
-        CACHE_PATH.write_text(
-            json.dumps(data, indent=2), encoding="utf-8"
-        )
+        CACHE_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
     except Exception:
         pass
 

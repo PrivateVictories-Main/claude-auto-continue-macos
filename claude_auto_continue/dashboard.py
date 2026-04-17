@@ -36,6 +36,7 @@ DEFAULT_PORT = 8787
 # Event bus — broadcast logs / status changes to SSE subscribers
 # ---------------------------------------------------------------------------
 
+
 class EventBus:
     """Tiny pub/sub with a rolling backlog for late subscribers."""
 
@@ -82,6 +83,7 @@ class EventBus:
 # ---------------------------------------------------------------------------
 # Shared state between the Monitor and the Dashboard
 # ---------------------------------------------------------------------------
+
 
 class SharedState:
     """Thread-safe bundle of live settings + latest status."""
@@ -131,11 +133,19 @@ class SharedState:
 
     _NUMERIC_FIELDS = {"interval", "cooldown", "max_continues"}
     _BOOL_FIELDS = {
-        "silent", "notifications", "log", "verbose", "dry_run",
-        "scan_app", "scan_browsers", "scan_terminals",
+        "silent",
+        "notifications",
+        "log",
+        "verbose",
+        "dry_run",
+        "scan_app",
+        "scan_browsers",
+        "scan_terminals",
     }
     _TUPLE_FIELDS = {
-        "terminal_patterns", "extra_continue_labels", "extra_context_keywords",
+        "terminal_patterns",
+        "extra_continue_labels",
+        "extra_context_keywords",
     }
 
     def update_settings(self, patch: dict[str, Any]) -> dict[str, Any]:
@@ -185,6 +195,7 @@ class SharedState:
 # HTTP server
 # ---------------------------------------------------------------------------
 
+
 class _Handler(BaseHTTPRequestHandler):
     state: SharedState  # set on the bound subclass
 
@@ -201,7 +212,12 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _cors_headers(self) -> None:
         origin = self.headers.get("Origin", "")
-        allowed = {"http://127.0.0.1", "http://localhost", "http://127.0.0.1:8787", "http://localhost:8787"}
+        allowed = {
+            "http://127.0.0.1",
+            "http://localhost",
+            "http://127.0.0.1:8787",
+            "http://localhost:8787",
+        }
         if origin in allowed:
             self.send_header("Access-Control-Allow-Origin", origin)
         else:
@@ -252,10 +268,12 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_error(400, str(exc))
             return
 
-        self._serve_json({
-            "applied": applied,
-            **self.state.full_snapshot(),
-        })
+        self._serve_json(
+            {
+                "applied": applied,
+                **self.state.full_snapshot(),
+            }
+        )
 
     # ----- response helpers -------------------------------------------
 
@@ -266,8 +284,8 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_error(500, "dashboard_ui.html unavailable")
             return
         from . import __version__ as pkg_version
-        text = text.replace('id="version">v…</span>',
-                            f'id="version">v{pkg_version}</span>')
+
+        text = text.replace('id="version">v…</span>', f'id="version">v{pkg_version}</span>')
         body = text.encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -352,6 +370,7 @@ def _json_fallback(obj: Any) -> Any:
 # ---------------------------------------------------------------------------
 # Dashboard (public API)
 # ---------------------------------------------------------------------------
+
 
 class Dashboard:
     def __init__(

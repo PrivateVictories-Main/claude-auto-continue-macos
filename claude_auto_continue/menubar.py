@@ -16,16 +16,14 @@ the menu bar via a thread-safe callback.
 
 from __future__ import annotations
 
-import threading
 import time
 import webbrowser
 from typing import Callable, Optional
 
+import objc
 from Cocoa import (
     NSApplication,
     NSApplicationActivationPolicyAccessory,
-    NSAttributedString,
-    NSFont,
     NSImage,
     NSMenu,
     NSMenuItem,
@@ -35,13 +33,12 @@ from Cocoa import (
     NSTimer,
     NSVariableStatusItemLength,
 )
-import objc
 from objc import python_method
 
 
 def _make_dot_image(color: str) -> NSImage:
     """Create a tiny coloured circle as an NSImage for the status bar."""
-    from AppKit import NSBezierPath, NSColor, NSGraphicsContext
+    from AppKit import NSBezierPath, NSColor
 
     size = NSSize(18, 18)
     image = NSImage.alloc().initWithSize_(size)
@@ -99,13 +96,9 @@ class MenuBarDelegate(NSObject):
         self._dashboard_url = dashboard_url
 
         status_bar = NSStatusBar.systemStatusBar()
-        self._status_item = status_bar.statusItemWithLength_(
-            NSVariableStatusItemLength
-        )
+        self._status_item = status_bar.statusItemWithLength_(NSVariableStatusItemLength)
 
-        self._dot_cache = {
-            c: _make_dot_image(c) for c in ("green", "yellow", "red", "gray")
-        }
+        self._dot_cache = {c: _make_dot_image(c) for c in ("green", "yellow", "red", "gray")}
         self._status_item.button().setImage_(self._dot_cache["gray"])
         self._status_item.button().setToolTip_("claude-auto-continue")
 
@@ -113,8 +106,14 @@ class MenuBarDelegate(NSObject):
         self._status_item.setMenu_(self._menu)
 
     @python_method
-    def update_state(self, color: str, label: str, continues: int,
-                     dry_run: bool = False, dashboard_url: Optional[str] = None):
+    def update_state(
+        self,
+        color: str,
+        label: str,
+        continues: int,
+        dry_run: bool = False,
+        dashboard_url: Optional[str] = None,
+    ):
         self._color = color
         self._state_label = label
         self._continues = continues
@@ -151,9 +150,7 @@ class MenuBarDelegate(NSObject):
         count_text = f"Continues: {self._continues}"
         if self._dry_run:
             count_text += " (dry run)"
-        count_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-            count_text, None, ""
-        )
+        count_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(count_text, None, "")
         count_item.setEnabled_(False)
         menu.addItem_(count_item)
 
@@ -209,8 +206,7 @@ class MenuBar:
     def set_dashboard_url(self, url: str) -> None:
         self._dashboard_url = url
 
-    def update(self, color: str, label: str, continues: int,
-               dry_run: bool = False) -> None:
+    def update(self, color: str, label: str, continues: int, dry_run: bool = False) -> None:
         if self._delegate is not None:
             self._delegate.update_state(
                 color=color,

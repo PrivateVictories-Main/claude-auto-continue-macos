@@ -18,7 +18,7 @@ Example config.toml:
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any, Optional
 
@@ -30,6 +30,7 @@ CONFIG_PATH = DEFAULT_HOME / "config.toml"
 # ---------------------------------------------------------------------------
 # Resolved settings dataclass
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Settings:
@@ -52,24 +53,22 @@ class Settings:
 
     def validate(self) -> None:
         if not (0.5 <= self.interval <= 30.0):
-            raise ValueError(
-                f"--interval must be between 0.5 and 30 seconds (got {self.interval})"
-            )
+            raise ValueError(f"--interval must be between 0.5 and 30 seconds (got {self.interval})")
         if self.cooldown < 0:
             raise ValueError(f"cooldown must be >= 0 (got {self.cooldown})")
         if self.max_continues < 0:
-            raise ValueError(
-                f"--max-continues must be >= 0 (got {self.max_continues})"
-            )
+            raise ValueError(f"--max-continues must be >= 0 (got {self.max_continues})")
 
 
 # ---------------------------------------------------------------------------
 # TOML loader with tomli fallback for Python 3.9/3.10
 # ---------------------------------------------------------------------------
 
+
 def _load_toml(path: Path) -> dict:
     if sys.version_info >= (3, 11):
         import tomllib  # type: ignore
+
         with path.open("rb") as f:
             return tomllib.load(f)
     try:
@@ -120,8 +119,7 @@ def merge(cli_values: dict[str, Any], file_values: dict[str, Any]) -> Settings:
             merged[key] = value
 
     # Coerce list values from TOML into the tuple types on Settings.
-    for tuple_key in ("terminal_patterns", "extra_continue_labels",
-                      "extra_context_keywords"):
+    for tuple_key in ("terminal_patterns", "extra_continue_labels", "extra_context_keywords"):
         if isinstance(merged.get(tuple_key), list):
             merged[tuple_key] = tuple(merged[tuple_key])
 

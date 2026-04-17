@@ -66,8 +66,7 @@ class Monitor:
         """
         try:
             ts = time.strftime("%H:%M:%S")
-            print(f"[DIAG {ts}] tick#{self._tick_count} {msg}",
-                  file=sys.stderr, flush=True)
+            print(f"[DIAG {ts}] tick#{self._tick_count} {msg}", file=sys.stderr, flush=True)
         except Exception:
             pass
 
@@ -129,10 +128,7 @@ class Monitor:
             self._sync_status()
 
             if s.max_continues and ui.status.total_continues >= s.max_continues:
-                msg = (
-                    f"reached --max-continues cap of {s.max_continues}; "
-                    "shutting down"
-                )
+                msg = f"reached --max-continues cap of {s.max_continues}; shutting down"
                 ui.warn(msg)
                 self._emit("warn", msg)
                 return
@@ -205,9 +201,7 @@ class Monitor:
 
         verbose_cb = ui.debug if self.ctx.settings.verbose else None
         remote = self.ctx.remote
-        extra_labels = (
-            self.ctx.settings.extra_continue_labels + remote.continue_labels
-        )
+        extra_labels = self.ctx.settings.extra_continue_labels + remote.continue_labels
         candidates = ax.find_continue_buttons(
             app,
             verbose_cb=verbose_cb,
@@ -217,10 +211,7 @@ class Monitor:
 
         if candidates or self._tick_count % 20 == 0:
             n_wins = len(ax.get_windows(app))
-            self._diag(
-                f"scan pid={app.pid} wins={n_wins} "
-                f"cands={len(candidates)}"
-            )
+            self._diag(f"scan pid={app.pid} wins={n_wins} cands={len(candidates)}")
 
         if not candidates:
             ui.heartbeat(f"tick — pid={app.pid}, no Continue button")
@@ -252,18 +243,14 @@ class Monitor:
             if b.pid not in self._seen_browser_pids:
                 ok = br.enable_enhanced_ax(b)
                 if self.ctx.settings.verbose:
-                    ui.debug(
-                        f"browser {b.name} (pid {b.pid}) AX enable={'ok' if ok else 'fail'}"
-                    )
+                    ui.debug(f"browser {b.name} (pid {b.pid}) AX enable={'ok' if ok else 'fail'}")
                 self._seen_browser_pids.add(b.pid)
         # Drop pids that have quit so a relaunched browser gets re-seeded.
         self._seen_browser_pids &= current_pids
 
         verbose_cb = ui.debug if self.ctx.settings.verbose else None
         remote = self.ctx.remote
-        extra_labels = (
-            self.ctx.settings.extra_continue_labels + remote.continue_labels
-        )
+        extra_labels = self.ctx.settings.extra_continue_labels + remote.continue_labels
         extra_hosts = remote.browser_hosts
         for b in browsers:
             try:
@@ -297,9 +284,7 @@ class Monitor:
         s = self.ctx.settings
         verbose_cb = ui.debug if self.ctx.settings.verbose else None
         remote = self.ctx.remote
-        extra_patterns = (
-            (s.terminal_patterns or ()) + remote.terminal_patterns
-        )
+        extra_patterns = (s.terminal_patterns or ()) + remote.terminal_patterns
         try:
             candidates = term.find_terminal_candidates(
                 extra_patterns=extra_patterns,
@@ -316,9 +301,7 @@ class Monitor:
             return True
 
         target = candidates[0]
-        source = (
-            f"{target.terminal_name} — matched {target.matched_pattern!r}"
-        )
+        source = f"{target.terminal_name} — matched {target.matched_pattern!r}"
 
         if s.dry_run:
             total = ui.status.increment_continues()
@@ -326,9 +309,7 @@ class Monitor:
             msg = f"[DRY RUN] Would have sent Return to {source}"
             ui.warn(msg)
             self._emit("warn", msg)
-            self.ctx.log.dry_run_hit(
-                total, surface="terminal", source=source
-            )
+            self.ctx.log.dry_run_hit(total, surface="terminal", source=source)
             return True
 
         ok = term.send_return_to(target.terminal_pid)
@@ -356,9 +337,7 @@ class Monitor:
             return False
         elapsed = time.monotonic() - self._last_click_at
         if elapsed < cooldown:
-            ui.heartbeat(
-                f"candidate found but cooldown holds ({cooldown - elapsed:.1f}s)"
-            )
+            ui.heartbeat(f"candidate found but cooldown holds ({cooldown - elapsed:.1f}s)")
             return True
         return False
 
@@ -379,9 +358,7 @@ class Monitor:
             msg = f"[DRY RUN] Would have clicked {label!r} in {source}"
             ui.warn(msg)
             self._emit("warn", msg)
-            self.ctx.log.dry_run_hit(
-                total, surface=surface, source=source
-            )
+            self.ctx.log.dry_run_hit(total, surface=surface, source=source)
             return
 
         ok = ax.press(element)

@@ -1,6 +1,5 @@
 """Tests for the activity log writer."""
 
-import pytest
 from claude_auto_continue.logger import ActivityLog
 
 
@@ -64,3 +63,39 @@ class TestActivityLog:
         content = log_file.read_text()
         assert "Auto-continue #1 triggered" in content
         assert "surface=" not in content
+
+
+class TestLogRotation:
+    def test_rotates_when_over_max_bytes(self, tmp_path):
+        log_file = tmp_path / "activity.log"
+        log = ActivityLog(path=log_file, enabled=True, max_bytes=200)
+        log.open()
+        for i in range(20):
+            log.note(f"line {i} padding to fill log " + "x" * 50)
+        log.close()
+
+        backup = log_file.with_suffix(".log.1")
+        assert backup.exists()
+        assert log_file.exists()
+        assert log_file.stat().st_size < 200
+
+    def test_no_rotation_when_under_limit(self, tmp_path):
+        log_file = tmp_path / "activity.log"
+        log = ActivityLog(path=log_file, enabled=True, max_bytes=1_000_000)
+        log.open()
+        log.note("short line")
+        log.close()
+
+        backup = log_file.with_suffix(".log.1")
+        assert not backup.exists()
+
+    def test_rotation_disabled_with_zero_max(self, tmp_path):
+        log_file = tmp_path / "activity.log"
+        log = ActivityLog(path=log_file, enabled=True, max_bytes=0)
+        log.open()
+        for i in range(10):
+            log.note(f"line {i}")
+        log.close()
+
+        backup = log_file.with_suffix(".log.1")
+        assert not backup.exists()

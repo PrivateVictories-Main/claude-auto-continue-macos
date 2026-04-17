@@ -12,14 +12,13 @@ from pathlib import Path
 from typing import Optional
 
 from . import __version__
-from .config import CONFIG_PATH, Settings, load_file, merge
-from .logger import ActivityLog, DEFAULT_HOME
+from .config import CONFIG_PATH, load_file, merge
+from .logger import DEFAULT_HOME, ActivityLog
 from .monitor import Monitor, MonitorContext
 from .notifications import Notifier
 from .permissions import detect_terminal, has_permission, setup_instructions
-from .remote_patterns import RemotePatterns, fetch as fetch_remote_patterns
+from .remote_patterns import fetch as fetch_remote_patterns
 from .ui import TerminalUI
-
 
 EXAMPLES = """\
 examples:
@@ -124,6 +123,16 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--check",
+        action="store_true",
+        default=False,
+        help=(
+            "Quick health check: report permission status, Claude app "
+            "detection, config validity, and LaunchAgent state. Exits 0 "
+            "if healthy, 1 if issues found."
+        ),
+    )
+    parser.add_argument(
         "--no-app",
         dest="scan_app",
         action="store_false",
@@ -197,6 +206,84 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _run_health_check(args: argparse.Namespace) -> int:
+    """Quick diagnostic: permission, Claude app, config, LaunchAgent."""
+    import os
+    import subprocess
+
+    from . import accessibility as ax
+
+    issues = 0
+
+    # 1. Permission
+    if has_permission():
+        print("  [ok] Accessibility permission granted")
+    else:
+        print("  [!!] Accessibility permission NOT granted")
+        issues += 1
+
+    # 2. Claude app
+    app = ax.find_claude_app()
+    if app is not None:
+        print(f"  [ok] Claude app detected (pid {app.pid})")
+        ok = ax.enable_manual_accessibility(app)
+        if ok:
+            print("  [ok] AX tree enabled")
+        else:
+            print("  [!!] AX tree could NOT be enabled")
+            issues += 1
+    else:
+        print("  [--] Claude app not running (not an error)")
+
+    # 3. Config
+    file_values = load_file(args.config) if args.config else load_file()
+    try:
+        merge(_args_to_dict(args), file_values)
+        config_src = args.config or CONFIG_PATH
+        if config_src.is_file() if hasattr(config_src, "is_file") else Path(config_src).is_file():
+            print(f"  [ok] Config valid ({config_src})")
+        else:
+            print("  [ok] No config file (using defaults)")
+    except ValueError as exc:
+        print(f"  [!!] Config error: {exc}")
+        issues += 1
+
+    # 4. LaunchAgent
+    user = os.environ.get("USER") or os.environ.get("LOGNAME") or "user"
+    label = f"com.{user}.claude-auto-continue"
+    uid = os.getuid()
+    result = subprocess.run(
+        ["launchctl", "print", f"gui/{uid}/{label}"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        print(f"  [ok] LaunchAgent loaded ({label})")
+    else:
+        print(f"  [--] LaunchAgent not loaded ({label})")
+
+    # 5. Dashboard
+    try:
+        from urllib.request import urlopen
+
+        resp = urlopen("http://127.0.0.1:8787/api/state", timeout=1)
+        if resp.status == 200:
+            print("  [ok] Dashboard responding at http://127.0.0.1:8787")
+        else:
+            print("  [--] Dashboard not responding")
+    except Exception:
+        print("  [--] Dashboard not responding")
+
+    # 6. Version
+    print(f"\n  Version: {__version__}")
+
+    if issues:
+        print(f"\n  {issues} issue(s) found.")
+        return 1
+    print("\n  All checks passed.")
+    return 0
+
+
 def _first_run_notice(ui: TerminalUI) -> None:
     """Create ~/.claude-auto-continue/ on first run and print a short note."""
     if DEFAULT_HOME.exists():
@@ -234,7 +321,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     # --setup short-circuits everything else and runs the walkthrough.
     if args.setup:
         from .setup import run_setup
+
         return run_setup()
+
+    if args.check:
+        return _run_health_check(args)
 
     # Load TOML first so CLI can override it.
     file_values = load_file(args.config) if args.config else load_file()
@@ -252,9 +343,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             # Interactive terminal: full banner + step-by-step guide.
             ui.show_banner()
             _first_run_notice(ui)
-            ui.warn(
-                f"Accessibility permission is not granted for {terminal.name}."
-            )
+            ui.warn(f"Accessibility permission is not granted for {terminal.name}.")
             ui.console.print()
             ui.console.print(setup_instructions(terminal))
             ui.console.print()
@@ -280,10 +369,13 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if args.update_check:
         from .update_check import check_async
-        check_async(lambda cur, latest: ui.warn(
-            f"update available: v{cur} → v{latest}  "
-            "(pip install --upgrade claude-auto-continue-macos)"
-        ))
+
+        check_async(
+            lambda cur, latest: ui.warn(
+                f"update available: v{cur} → v{latest}  "
+                "(pip install --upgrade claude-auto-continue-macos)"
+            )
+        )
 
     verbose_cb = ui.debug if settings.verbose else None
     remote = fetch_remote_patterns(verbose_cb=verbose_cb)
@@ -311,10 +403,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     dashboard = None
     if args.dashboard:
         from .dashboard import SharedState, try_start
+
         shared_state = SharedState(settings=settings)
-        fallback_ports = tuple(
-            range(args.dashboard_port + 1, args.dashboard_port + 6)
-        )
+        fallback_ports = tuple(range(args.dashboard_port + 1, args.dashboard_port + 6))
         dashboard, err = try_start(
             shared_state,
             host=args.dashboard_host,
@@ -323,13 +414,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
         if dashboard is not None:
             ui.info(f"dashboard running at {dashboard.url}")
-            shared_state.publish_log(
-                "info", f"dashboard running at {dashboard.url}"
-            )
+            shared_state.publish_log("info", f"dashboard running at {dashboard.url}")
         else:
-            ui.warn(
-                f"dashboard could not start ({err}); running without it"
-            )
+            ui.warn(f"dashboard could not start ({err}); running without it")
 
     ctx = MonitorContext(
         settings=settings,
@@ -352,6 +439,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     menu_bar = None
     if args.menu_bar:
         from .menubar import MenuBar
+
         menu_bar = MenuBar(quit_callback=lambda: _request_stop(None, None))
         if dashboard is not None:
             menu_bar.set_dashboard_url(dashboard.url)
@@ -395,6 +483,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                     dry_run=status.dry_run,
                 )
                 import time
+
                 time.sleep(1.0)
 
         monitor_thread = threading.Thread(target=_run_monitor, daemon=True)

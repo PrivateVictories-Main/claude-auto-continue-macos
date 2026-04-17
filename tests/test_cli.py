@@ -1,7 +1,6 @@
 """Tests for CLI argument parsing and config merge flow."""
 
-import pytest
-from claude_auto_continue.cli import build_parser, _args_to_dict
+from claude_auto_continue.cli import _args_to_dict, build_parser
 
 
 class TestArgParser:
@@ -97,6 +96,16 @@ class TestArgParser:
         parser = build_parser()
         args = parser.parse_args(["--no-update-check"])
         assert args.update_check is False
+
+    def test_check_flag(self):
+        parser = build_parser()
+        args = parser.parse_args(["--check"])
+        assert args.check is True
+
+    def test_check_default(self):
+        parser = build_parser()
+        args = parser.parse_args([])
+        assert args.check is False
 
 
 class TestArgsToDict:

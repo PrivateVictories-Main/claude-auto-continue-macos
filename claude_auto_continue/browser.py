@@ -32,7 +32,6 @@ from Cocoa import NSWorkspace
 
 from . import accessibility as ax
 
-
 CLAUDE_HOSTS = (
     "claude.ai",
     "www.claude.ai",
@@ -54,9 +53,9 @@ BROWSER_BUNDLE_IDS = (
     "com.brave.Browser",
     "com.brave.Browser.beta",
     "com.brave.Browser.nightly",
-    "company.thebrowser.Browser",           # Arc
-    "company.thebrowser.dia",               # Dia by The Browser Company
-    "com.openai.atlas",                     # ChatGPT Atlas
+    "company.thebrowser.Browser",  # Arc
+    "company.thebrowser.dia",  # Dia by The Browser Company
+    "com.openai.atlas",  # ChatGPT Atlas
     "org.mozilla.firefox",
     "org.mozilla.firefoxdeveloperedition",
     "org.mozilla.nightly",
@@ -72,7 +71,7 @@ BROWSER_BUNDLE_IDS = (
     "com.vivaldi.Vivaldi",
     "org.chromium.Chromium",
     "com.naver.Whale",
-    "com.kagi.kagimacOS",                   # Orion
+    "com.kagi.kagimacOS",  # Orion
     "com.kagi.Orion",
     "com.sidekick.Sidekick",
     "io.sigmaos.SigmaOS",
@@ -91,9 +90,20 @@ BROWSER_BUNDLE_IDS = (
 # their id are fine — we'll still only click a Continue button inside
 # a claude.ai AXWebArea.
 _BROWSER_HEURISTIC_TOKENS = (
-    "browser", "chrome", "chromium", "firefox", "safari",
-    "webkit", "opera", "edge", "brave", "vivaldi", "arc",
-    "duckduckgo", "orion", "whale",
+    "browser",
+    "chrome",
+    "chromium",
+    "firefox",
+    "safari",
+    "webkit",
+    "opera",
+    "edge",
+    "brave",
+    "vivaldi",
+    "arc",
+    "duckduckgo",
+    "orion",
+    "whale",
 )
 
 
@@ -115,6 +125,7 @@ class BrowserApp:
 @dataclass
 class BrowserCandidate:
     """A Continue button found inside a claude.ai web-view subtree."""
+
     element: object
     label: str
     browser_name: str
@@ -151,12 +162,14 @@ def find_browsers() -> list[BrowserApp]:
             continue
         pid = int(app.processIdentifier())
         element = AXUIElementCreateApplication(pid)
-        found.append(BrowserApp(
-            pid=pid,
-            bundle_id=bid,
-            name=app.localizedName() or bid,
-            element=element,
-        ))
+        found.append(
+            BrowserApp(
+                pid=pid,
+                bundle_id=bid,
+                name=app.localizedName() or bid,
+                element=element,
+            )
+        )
     return found
 
 
@@ -241,10 +254,7 @@ def find_browser_continue_buttons(
 
         web_roots = list(_iter_web_subtrees(window))
         if verbose_cb:
-            verbose_cb(
-                f"  browser={browser.name} window[{win_idx}] "
-                f"web_areas={len(web_roots)}"
-            )
+            verbose_cb(f"  browser={browser.name} window[{win_idx}] web_areas={len(web_roots)}")
         if not web_roots:
             continue
 
@@ -257,20 +267,19 @@ def find_browser_continue_buttons(
             if verbose_cb:
                 verbose_cb(f"    scan claude tab: {url}")
 
-            for node, _depth in ax.walk(web_root,
-                                        max_depth=ax.MAX_RECURSION_DEPTH):
+            for node, _depth in ax.walk(web_root, max_depth=ax.MAX_RECURSION_DEPTH):
                 role = ax._element_role(node)
                 label = ax._element_label(node)
 
-                if ax._is_button(role) and ax._looks_like_continue(
-                    label, extra_labels
-                ):
-                    found.append(BrowserCandidate(
-                        element=node,
-                        label=label,
-                        browser_name=browser.name,
-                        browser_pid=browser.pid,
-                        url=url,
-                    ))
+                if ax._is_button(role) and ax._looks_like_continue(label, extra_labels):
+                    found.append(
+                        BrowserCandidate(
+                            element=node,
+                            label=label,
+                            browser_name=browser.name,
+                            browser_pid=browser.pid,
+                            url=url,
+                        )
+                    )
 
     return found

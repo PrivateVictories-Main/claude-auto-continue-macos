@@ -15,12 +15,10 @@ degrades to a concise plain-text script so CI / headless use still works.
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Optional
 
 from rich.align import Align
 from rich.console import Console, Group
@@ -32,11 +30,9 @@ from rich.text import Text
 
 from . import __version__
 from . import accessibility as ax
-from .permissions import detect_terminal
 
 ACCESSIBILITY_PANE_URL = (
-    "x-apple.systempreferences:com.apple.preference.security?"
-    "Privacy_Accessibility"
+    "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
 )
 
 
@@ -82,9 +78,7 @@ def _is_launch_agent_loaded() -> bool:
 def _run_install_script(console: Console) -> bool:
     script = _repo_root() / "scripts" / "install-launchagent.sh"
     if not script.is_file():
-        console.print(
-            Text(f"install script not found at {script}", style="red")
-        )
+        console.print(Text(f"install script not found at {script}", style="red"))
         return False
     console.print(Text(f"running {script}", style="dim"))
     proc = subprocess.run([str(script)], capture_output=True, text=True)
@@ -150,21 +144,20 @@ def _permission_panel(python_path: str) -> Panel:
         ),
         Text(""),
         Text("Interpreter path (copy this):", style="bold"),
-        Panel(Text(python_path, style="bold green"), border_style="green",
-              padding=(0, 1)),
+        Panel(Text(python_path, style="bold green"), border_style="green", padding=(0, 1)),
         Text(""),
         Text("Instructions:", style="bold"),
         Text("  1. System Settings should have just opened at the"),
         Text("     Privacy & Security → Accessibility pane."),
         Text("  2. Click the  +  button at the bottom of the app list."),
         Text("     (You may need to unlock with Touch ID or password.)"),
-        Text("  3. Press  Cmd + Shift + G  to get the \"Go to Folder\" field."),
+        Text('  3. Press  Cmd + Shift + G  to get the "Go to Folder" field.'),
         Text("  4. Paste the interpreter path above and press Enter."),
         Text("  5. Click  Open , then flip the toggle to ON."),
         Text(""),
         Text(
             "macOS resolves the venv symlink to the real Python binary —\n"
-            "the entry will read something like \"python3.14\". That's\n"
+            'the entry will read something like "python3.14". That\'s\n'
             "expected and correct.",
             style="dim",
         ),
@@ -281,15 +274,10 @@ def _headless_setup(console: Console) -> int:
     console.print("claude-auto-continue setup (non-interactive)")
     console.print(f"  python interpreter: {_python_path()}")
     console.print(f"  launch agent label: {_launch_agent_label()}")
+    console.print("  grant Accessibility to the interpreter above in:")
+    console.print("    System Settings -> Privacy & Security -> Accessibility")
     console.print(
-        "  grant Accessibility to the interpreter above in:"
-    )
-    console.print(
-        "    System Settings -> Privacy & Security -> Accessibility"
-    )
-    console.print(
-        "  then run  ./scripts/install-launchagent.sh  to install the"
-        " background service."
+        "  then run  ./scripts/install-launchagent.sh  to install the background service."
     )
     return 0
 
@@ -355,9 +343,7 @@ def run_setup() -> int:
             )
             return 2
 
-        console.print(
-            Text("✓ permission granted.", style="bold green")
-        )
+        console.print(Text("✓ permission granted.", style="bold green"))
 
     # -------- Step 2: LaunchAgent -------------------------------------------
     _step_header(console, 2, total_steps, "Install as a background service")
@@ -366,8 +352,7 @@ def run_setup() -> int:
     if already_loaded:
         console.print(
             Text(
-                "✓ LaunchAgent is already loaded. Reinstalling would restart "
-                "it with fresh code.",
+                "✓ LaunchAgent is already loaded. Reinstalling would restart it with fresh code.",
                 style="green",
             )
         )

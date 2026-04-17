@@ -35,7 +35,6 @@ from ApplicationServices import (
     kAXFocusedWindowAttribute,
     kAXHelpAttribute,
     kAXRoleAttribute,
-    kAXRoleDescriptionAttribute,
     kAXTitleAttribute,
     kAXTrustedCheckOptionPrompt,
     kAXValueAttribute,
@@ -108,6 +107,7 @@ class ClaudeApp:
 # Permissions
 # ---------------------------------------------------------------------------
 
+
 def is_process_trusted(prompt: bool = False) -> bool:
     """Return True if this process has Accessibility permission.
 
@@ -167,6 +167,7 @@ def _build_claude_app(ns_app) -> ClaudeApp:
 # Electron AXManualAccessibility enable
 # ---------------------------------------------------------------------------
 
+
 def enable_manual_accessibility(app: ClaudeApp) -> bool:
     """Set AXManualAccessibility=True on the app element.
 
@@ -181,6 +182,7 @@ def enable_manual_accessibility(app: ClaudeApp) -> bool:
 # ---------------------------------------------------------------------------
 # Attribute reads and tree traversal
 # ---------------------------------------------------------------------------
+
 
 def _attr(element, name) -> object:
     """Read a single AX attribute. Returns None on any failure."""
@@ -233,6 +235,7 @@ def walk(element, max_depth: int = MAX_RECURSION_DEPTH) -> Iterator[tuple[object
 # Button detection
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ButtonCandidate:
     element: object
@@ -243,8 +246,7 @@ class ButtonCandidate:
 
 def _element_label(element) -> str:
     """Best-effort readable label for an element."""
-    for attr in (kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute,
-                 kAXHelpAttribute):
+    for attr in (kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute, kAXHelpAttribute):
         value = _attr(element, attr)
         if value:
             text = str(value).strip()
@@ -271,7 +273,7 @@ def _looks_like_continue(label: str, extra_labels: tuple[str, ...] = ()) -> bool
         return True
     for prefix in ("continue", "resume", "proceed", "keep going"):
         if lower.startswith(prefix) and len(lower) <= 50:
-            tail = lower[len(prefix):]
+            tail = lower[len(prefix) :]
             if not tail or tail[0] == " ":
                 return True
     return False
@@ -295,8 +297,7 @@ def find_continue_buttons(
     """
     found: list[ButtonCandidate] = []
     windows = get_windows(app)
-    text_attrs = (kAXTitleAttribute, kAXDescriptionAttribute,
-                  kAXValueAttribute, kAXHelpAttribute)
+    text_attrs = (kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute, kAXHelpAttribute)
     max_context_chars = 8000
     all_keywords = TOOL_USE_CONTEXT_KEYWORDS + extra_keywords
 
@@ -318,12 +319,14 @@ def find_continue_buttons(
                 if verbose_cb:
                     verbose_cb(f"  button@d{depth} role={role!r} label={label!r}")
                 if _looks_like_continue(label, extra_labels):
-                    candidates_this_window.append(ButtonCandidate(
-                        element=node,
-                        label=label,
-                        role=role,
-                        window_index=idx,
-                    ))
+                    candidates_this_window.append(
+                        ButtonCandidate(
+                            element=node,
+                            label=label,
+                            role=role,
+                            window_index=idx,
+                        )
+                    )
 
             if require_context and not has_context and context_chars < max_context_chars:
                 for attr in text_attrs:
@@ -361,6 +364,7 @@ def find_continue_buttons(
 # ---------------------------------------------------------------------------
 # Action
 # ---------------------------------------------------------------------------
+
 
 def press(element) -> bool:
     """Perform AXPress on an element. Returns True on success."""

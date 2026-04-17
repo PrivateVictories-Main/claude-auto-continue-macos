@@ -30,10 +30,9 @@ class TestDetectTerminal:
         assert info.name == "Visual Studio Code"
 
     def test_fallback_to_term_program(self):
-        env = {"TERM_PROGRAM": "Ghostty"}
+        env = {"__CFBundleIdentifier": "", "TERM_PROGRAM": "Ghostty"}
         with patch.dict(os.environ, env, clear=False):
-            with patch.dict(os.environ, {"__CFBundleIdentifier": ""}, clear=False):
-                info = detect_terminal()
+            info = detect_terminal()
         assert info.name == "Ghostty"
         assert info.bundle_id is None
 

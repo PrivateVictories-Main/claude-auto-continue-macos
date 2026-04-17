@@ -2,6 +2,21 @@
 
 All notable changes to claude-auto-continue are documented here.
 
+## [0.7.4] - 2026-04-17
+
+### Added
+- `--check` health check mode: report permission, Claude detection, config validity, LaunchAgent, and dashboard status in one command
+- Activity log rotation at 5 MB (keeps one `.log.1` backup)
+- Ruff linting + formatting enforced in CI (`ruff check` + `ruff format --check`)
+- `config.example.toml` with fully-commented settings for easy setup
+- Shared pytest fixtures in `conftest.py`
+- **359+ tests** across 15 test files
+
+### Improved
+- All source and test files formatted with ruff (consistent style)
+- Import sorting enforced project-wide
+- Unused imports removed
+
 ## [0.7.3] - 2026-04-17
 
 ### Added

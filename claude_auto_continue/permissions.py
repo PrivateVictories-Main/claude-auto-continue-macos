@@ -16,7 +16,6 @@ from typing import Optional
 
 from .accessibility import is_process_trusted
 
-
 # Map bundle IDs or process names to human-friendly terminal names. Keys are
 # lowercased; we check env vars, the parent process, and common bundles.
 _TERMINAL_BUNDLES: dict[str, str] = {

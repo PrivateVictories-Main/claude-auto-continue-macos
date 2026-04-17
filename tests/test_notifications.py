@@ -1,6 +1,6 @@
 """Tests for notifications.py — sound and notification dispatch."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from claude_auto_continue.notifications import (
     Notifier,
