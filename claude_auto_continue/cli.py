@@ -178,6 +178,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Bind address for the dashboard (default 127.0.0.1).",
     )
     parser.add_argument(
+        "--no-update-check",
+        dest="update_check",
+        action="store_false",
+        default=True,
+        help="Skip the background check for newer versions on PyPI.",
+    )
+    parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s {__version__}",
@@ -265,6 +272,13 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     ui.show_banner()
     _first_run_notice(ui)
+
+    if args.update_check:
+        from .update_check import check_async
+        check_async(lambda cur, latest: ui.warn(
+            f"update available: v{cur} → v{latest}  "
+            "(pip install --upgrade claude-auto-continue-macos)"
+        ))
 
     verbose_cb = ui.debug if settings.verbose else None
     remote = fetch_remote_patterns(verbose_cb=verbose_cb)
