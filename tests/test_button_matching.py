@@ -45,15 +45,23 @@ class TestPrefixMatching:
         assert not _looks_like_continue("Continue " + "x" * 50)
 
     @pytest.mark.parametrize("label", [
+        "Resume - ready",
+        "Proceed with next step",
+        "Continue please",
+    ])
+    def test_space_after_prefix(self, label):
+        assert _looks_like_continue(label)
+
+    @pytest.mark.parametrize("label", [
         "Continue?",
         "Continue!",
         "Continue...",
-        "Resume - ready",
-        "Proceed: next step",
+        "Proceed: next",
         "Continue, please",
     ])
-    def test_punctuation_after_prefix(self, label):
-        assert _looks_like_continue(label)
+    def test_punctuation_after_prefix_rejected(self, label):
+        """Punctuation directly after prefix is rejected to avoid file names."""
+        assert not _looks_like_continue(label)
 
     @pytest.mark.parametrize("label", [
         "continue",
