@@ -166,8 +166,9 @@ claude-auto-continue [--setup]
                      [--silent] [--no-notifications]
                      [--max-continues N] [--no-log] [--verbose]
                      [--no-app] [--no-browsers] [--terminals]
-                     [--menu-bar]
+                     [--menu-bar] [--no-update-check]
                      [--no-dashboard] [--dashboard-port PORT]
+                     [--dashboard-host HOST]
                      [--config PATH] [--version]
 ```
 
@@ -190,6 +191,8 @@ claude-auto-continue [--setup]
 | `--menu-bar` | off | Show a status icon in the macOS menu bar (green/yellow/red dot) with live state, continue count, and quick actions. |
 | `--no-dashboard` | off | Disable the localhost control dashboard. |
 | `--dashboard-port PORT` | `8787` | Port for the dashboard (127.0.0.1 only). |
+| `--dashboard-host HOST` | `127.0.0.1` | Bind address for the dashboard. |
+| `--no-update-check` | off | Skip the background check for newer versions on PyPI. |
 | `--config PATH` | `~/.claude-auto-continue/config.toml` | Use a custom TOML config file. |
 | `--version` | — | Print version and exit. |
 

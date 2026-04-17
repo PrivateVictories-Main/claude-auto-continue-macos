@@ -23,15 +23,20 @@ from .ui import TerminalUI
 
 EXAMPLES = """\
 examples:
-  claude-auto-continue                          # default 3-second polling
+  claude-auto-continue                          # default polling
   claude-auto-continue --setup                  # first-run walkthrough
   claude-auto-continue --dry-run                # test without clicking
   claude-auto-continue --silent --no-notifications
   claude-auto-continue --interval 5             # slower polling
+  claude-auto-continue --cooldown 10            # longer gap between clicks
   claude-auto-continue --max-continues 10       # stop after 10 continues
   claude-auto-continue --no-browsers            # desktop app only
+  claude-auto-continue --no-app --terminals     # Claude Code CLI only
   claude-auto-continue --terminals              # also watch Claude Code CLI
+  claude-auto-continue --menu-bar               # status icon in menu bar
   claude-auto-continue --verbose                # show tree scans
+  claude-auto-continue --no-update-check        # skip PyPI version check
+  claude-auto-continue --config ~/custom.toml   # custom config file
 
 config file (optional): ~/.claude-auto-continue/config.toml
 """
