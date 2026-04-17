@@ -1,6 +1,6 @@
 # claude-auto-continue-macos
 
-> Automatically clicks "Continue" everywhere Claude paused your session — the native macOS app, claude.ai in any browser, and optionally Claude Code in your terminal. No extension required.
+> Automatically clicks "Continue" everywhere Claude pauses your session — the native macOS app, claude.ai in any browser, and Claude Code in your terminal. No extension required. Future-proof against UI changes.
 
 A small, focused Python CLI that watches every place Claude might be
 waiting for you and resumes the session automatically. Walk away from a
@@ -12,38 +12,63 @@ screen.
 ## What it does
 
 Claude pauses long tool-use sessions and asks you to click **Continue**
-(or press Enter) before it keeps going. This tool watches three places at
-once and resumes whichever one is paused:
+(or press Enter) before it keeps going. This tool watches three surfaces
+at once and resumes whichever one is paused:
 
-- **The native Claude desktop app** — AXPress on the tool-use-limit
-  Continue button.
+- **The native Claude desktop app** — AXPress on the Continue button.
+  Context-free detection: the app itself is the context, so we don't
+  need to match specific limit text. Immune to Anthropic rewording the
+  pause message in future updates.
 - **claude.ai in any browser** — Safari, Chrome, Brave, Arc, Dia, Edge,
   Opera, Vivaldi, Firefox, Atlas, and any other Chromium/WebKit/Gecko
   browser that ships on macOS (detected via bundle-ID heuristic, so
   brand-new forks work with no code update). Only `claude.ai` web-areas
   are scanned; other tabs and sites are ignored. Works across many open
   tabs — every `claude.ai` `AXWebArea` in every window is visited each
-  tick.
+  tick. URL filtering scopes the scanner, so no context keywords are
+  needed here either.
 - **Claude Code CLI** (opt-in) — any terminal you put in front. We watch
   the frontmost app and send a single Return keystroke when a narrow
-  tool-use-limit pattern appears. Because the frontmost app is whoever
-  receives the keystroke anyway, **every terminal works without an
-  allowlist**: Warp, iTerm2, Ghostty, Terminal.app, Kitty, Alacritty,
-  WezTerm, Hyper, Tabby, Rio, Wave, VS Code, Cursor, Windsurf — current
-  or future. Browsers, Finder, Dock, system UI and the Claude desktop
-  app are explicitly excluded.
+  tool-use-limit pattern appears. 28+ built-in patterns plus regex
+  support cover current and future Claude Code prompt variations. Because
+  the frontmost app is whoever receives the keystroke anyway, **every
+  terminal works without an allowlist**: Warp, iTerm2, Ghostty,
+  Terminal.app, Kitty, Alacritty, WezTerm, Hyper, Tabby, Rio, Wave,
+  VS Code, Cursor, Windsurf — current or future. Browsers, Finder, Dock,
+  system UI and the Claude desktop app are explicitly excluded.
 
-It only ever acts in the correct context — it ignores unrelated
-"Continue" buttons elsewhere in the UI.
+### Future-proofing
+
+All three scanners are designed to keep working when Anthropic ships UI
+updates:
+
+- **Desktop app + browser:** Detection is context-free — any button whose
+  label starts with "continue", "resume", "proceed", or "keep going"
+  (plus 18 exact-match labels) triggers a click. No fragile keyword
+  matching against surrounding text.
+- **Terminals:** 28+ pause patterns with regex fallbacks catch spacing
+  changes, wording tweaks, and new prompt styles. Custom patterns can be
+  added in the config file.
+- **Remote patterns:** On startup, the agent fetches `patterns.json`
+  from this GitHub repo and merges any new labels, keywords, or patterns
+  with the built-in lists. If Anthropic changes a button label tomorrow,
+  a one-line JSON edit ships the fix to every user — no code update
+  needed. The fetch is cached for 6 hours and fails gracefully (4s
+  timeout, fallback to built-in).
+- **User overrides:** The config file supports `extra_continue_labels`,
+  `extra_context_keywords`, and `terminal_patterns` for user-defined
+  additions that merge with everything above.
 
 ## How it works
 
 `claude-auto-continue` uses the macOS **Accessibility API** via `pyobjc`.
-Every few seconds it reads Claude's UI element tree (the same tree
-VoiceOver and other screen readers use) and looks for a Continue button
-inside a window that also mentions the tool-use limit. When it finds one,
-it performs the standard `AXPress` accessibility action on that button —
-the same thing a screen reader user would do.
+Every 1.5 seconds it reads Claude's UI element tree (the same tree
+VoiceOver and other screen readers use) and looks for a Continue button.
+When it finds one, it performs the standard `AXPress` accessibility action
+on that button — the same thing a screen reader user would do.
+
+After each click, a fast 0.4s follow-up scan catches back-to-back pauses
+(consecutive tool-use limits) before falling back to the normal interval.
 
 It does **not**:
 
@@ -51,7 +76,6 @@ It does **not**:
 - use OCR or computer vision
 - inject code into the Claude app
 - read keystrokes, clipboard, or files
-- make network requests of any kind
 
 ### The Electron accessibility caveat
 
@@ -73,8 +97,8 @@ AXUIElementSetAttributeValue(app, "AXManualAccessibility", true)
 
 Extensions only see one browser at a time and can't touch the native
 desktop app or the terminal. This tool uses the macOS Accessibility API
-instead, which covers every surface a single install and one permission
-grant. The older
+instead, which covers every surface with a single install and one
+permission grant. The older
 [`claude-autocontinue`](https://github.com/timothy22000/claude-autocontinue)
 Chrome/Firefox extension still works if you prefer that — they're not
 mutually exclusive.
@@ -133,6 +157,7 @@ claude-auto-continue [--setup]
                      [--silent] [--no-notifications]
                      [--max-continues N] [--no-log] [--verbose]
                      [--no-app] [--no-browsers] [--terminals]
+                     [--no-dashboard] [--dashboard-port PORT]
                      [--config PATH] [--version]
 ```
 
@@ -152,9 +177,10 @@ claude-auto-continue [--setup]
 | `--no-app` | off | Don't scan the native Claude desktop app. |
 | `--no-browsers` | off | Don't scan browsers for claude.ai tabs. |
 | `--terminals` | off | **Also** scan terminal apps for Claude Code CLI pauses. Opt-in because this sends Return keystrokes. |
+| `--no-dashboard` | off | Disable the localhost control dashboard. |
+| `--dashboard-port PORT` | `8787` | Port for the dashboard (127.0.0.1 only). |
 | `--config PATH` | `~/.claude-auto-continue/config.toml` | Use a custom TOML config file. |
 | `--version` | — | Print version and exit. |
-| `--help` | — | Full help menu. |
 
 ### Common recipes
 
@@ -191,7 +217,7 @@ claude-auto-continue --verbose --dry-run
 
 ## Localhost control dashboard
 
-Every run now ships with a small, glassy, Claude-themed dashboard at
+Every run ships with a small, glassy, Claude-themed dashboard at
 **`http://127.0.0.1:8787`**. Toggle any of the three scanners on or off
 live, tune the polling interval and cooldown, enable dry-run, and watch
 events stream in from the running monitor. The dashboard talks to the
@@ -283,7 +309,7 @@ for any flag. CLI arguments always win.
 
 ```toml
 # ~/.claude-auto-continue/config.toml
-interval        = 3
+interval        = 1.5
 cooldown        = 5
 silent          = false
 notifications   = true
@@ -297,16 +323,76 @@ scan_app        = true    # native Claude desktop app
 scan_browsers   = true    # claude.ai in any running browser
 scan_terminals  = false   # opt in — sends Return keystrokes
 
+# Extra button labels to recognise (merged with built-in + remote lists)
+extra_continue_labels = [
+    # "go ahead",
+    # "keep generating",
+]
+
+# Extra context keywords (used only when require_context is True)
+extra_context_keywords = [
+    # "custom pause text",
+]
+
 # Extra text patterns that identify a Claude Code CLI pause.
-# Matched as case-insensitive substrings against the focused terminal.
+# Plain strings are matched as case-insensitive substrings.
+# Prefix with "re:" for regex matching: "re:custom\s+pause\s+\d+"
 terminal_patterns = [
     # "press enter to resume",
-    # "session paused, press any key",
+    # "re:session\\s+paused",
 ]
 ```
 
 Requires Python 3.11+ (stdlib `tomllib`) or the `tomli` package on older
 Pythons — already pinned for you in `requirements.txt`.
+
+---
+
+## Remote patterns (`patterns.json`)
+
+The repo root contains a `patterns.json` file that the agent fetches from
+GitHub on startup. This is the zero-code-update escape hatch: if Anthropic
+renames a button or changes a terminal prompt, a one-line edit to
+`patterns.json` ships the fix to every running instance within 6 hours
+(the cache TTL).
+
+The file supports these keys — all are additive (merged with built-in
+lists, never replace):
+
+```json
+{
+  "version": 1,
+  "continue_labels": [],
+  "context_keywords": [],
+  "terminal_patterns": [],
+  "browser_hosts": [],
+  "claude_bundle_ids": [],
+  "browser_bundle_ids": [],
+  "browser_heuristic_tokens": []
+}
+```
+
+The fetch runs once at startup (4s timeout), caches to
+`~/.claude-auto-continue/patterns_cache.json`, and fails gracefully —
+if GitHub is unreachable, the agent runs on built-in patterns only.
+
+---
+
+## Tests
+
+202 unit tests cover the core matching logic:
+
+```bash
+pip install pytest
+pytest tests/ -v
+```
+
+Tests cover:
+- Button label matching (exact, prefix, case, whitespace, false positives)
+- Terminal pause patterns (substring, regex, edge cases)
+- Remote patterns (parsing, cache round-trip, expiry, corruption, fallback)
+- Browser URL matching (valid/invalid URLs, subdomains, extra hosts)
+- Browser heuristic detection (known/unknown bundle IDs)
 
 ---
 
@@ -321,15 +407,15 @@ exactly what that means and what it does.
 - With that permission, it can **only** read UI element metadata —
   button labels, window titles, roles. It **cannot** read your
   conversation content, keystrokes, clipboard, files, or anything else.
-- It performs at most two kinds of action, and only when a narrow
-  tool-use-limit context is confirmed:
+- It performs at most two kinds of action:
   - `AXPress` on a Continue-looking button (native app, or a claude.ai
     tab in a browser).
   - A single Return keystroke sent to a terminal process, **opt-in via
     `--terminals`**, only when an unambiguous Claude Code pause
     pattern is visible in that terminal's focused window.
-- It makes **zero** network requests. It never phones home. It has no
-  analytics, no telemetry, no update pings.
+- On startup it makes **one** HTTPS request to fetch `patterns.json`
+  from this GitHub repo (cached 6h, 4s timeout, fails silently). No
+  other network requests. No analytics, no telemetry, no update pings.
 - It is fully open source. Read every file yourself — the whole thing is
   a few hundred lines of straightforward Python. The accessibility code
   lives in `claude_auto_continue/accessibility.py` and uses nothing
@@ -355,9 +441,10 @@ exactly what that means and what it does.
 
 Honesty section:
 
-- If Anthropic changes the Continue button's label in a future release,
-  the tool needs a one-line update. The `--verbose` flag helps diagnose
-  this quickly — the tree walk prints every button it sees.
+- If Anthropic changes the Continue button's label *and* none of the
+  18 exact labels or 4 prefix patterns match, the tool needs a
+  `patterns.json` update (no code change). The `--verbose` flag helps
+  diagnose — the tree walk prints every button it sees.
 - **Background tabs in Chromium browsers** can have their renderer AX
   tree briefly suspended to save CPU. In practice we still pick up the
   Continue button because `AXEnhancedUserInterface` keeps the tree
@@ -371,10 +458,15 @@ Honesty section:
 
 ## Roadmap
 
+- [x] Context-free desktop app detection (v0.5.0)
+- [x] Context-free browser detection (v0.6.0)
+- [x] Remote-fetched patterns for zero-code-update fixes (v0.6.0)
+- [x] Regex terminal patterns (v0.6.0)
+- [x] 202 unit tests (v0.6.0)
+- [x] User-configurable button-text patterns (v0.6.0)
 - [ ] Homebrew formula for one-command install
 - [ ] Optional menu bar companion icon with status
 - [ ] Windows support via UI Automation API
-- [ ] User-configurable button-text patterns for future-proofing
 - [ ] Optional auto-update check
 
 ---
@@ -385,6 +477,7 @@ PRs welcome. Please:
 
 - Match the existing style — small, focused modules, docstrings at the
   top of each file, no new dependencies unless they pull their weight.
+- Run `pytest tests/ -v` and confirm all tests pass before submitting.
 - File bugs via the [issue template](.github/ISSUE_TEMPLATE/bug_report.md)
   and include `--verbose` output where relevant.
 
