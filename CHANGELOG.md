@@ -2,11 +2,16 @@
 
 All notable changes to claude-auto-continue are documented here.
 
-## [0.7.2] - 2026-04-17
+## [0.7.3] - 2026-04-17
 
 ### Added
 - Auto-update check: background PyPI version check at startup, disable with `--no-update-check`
 - 4 new test files: permissions, notifications, ui, monitor — **354 total tests** across 14 files
+- Python 3.11 added to CI matrix
+- Missing flags documented in README (`--no-update-check`, `--dashboard-host`)
+- Expanded CLI examples with `--menu-bar`, `--no-app`, `--cooldown`, `--config`
+
+## [0.7.2] - 2026-04-17
 
 ### Fixed
 - Dashboard: Content-Length validation now rejects negative and non-numeric values
