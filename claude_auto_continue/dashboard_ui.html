@@ -1079,13 +1079,15 @@
     // ---- SSE -------------------------------------------------------
     let sseOpen = false;
     let es = null;
+    let sseRetryMs = 1000;
     const connectSSE = () => {
       try { es?.close(); } catch (_) {}
       es = new EventSource("/api/events");
-      es.onopen = () => { sseOpen = true; paintStatus(); };
+      es.onopen = () => { sseOpen = true; sseRetryMs = 1000; paintStatus(); };
       es.onerror = () => {
         sseOpen = false; paintStatus();
-        setTimeout(connectSSE, 2000);
+        setTimeout(connectSSE, sseRetryMs);
+        sseRetryMs = Math.min(sseRetryMs * 1.5, 10000);
       };
       es.onmessage = (ev) => {
         let data;

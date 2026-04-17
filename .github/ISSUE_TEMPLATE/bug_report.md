@@ -21,6 +21,13 @@ labels: bug
 2.
 3.
 
+### Health check output
+<!-- Run `claude-auto-continue --check` and paste the output. -->
+
+```
+paste --check output here
+```
+
 ### Verbose output
 <!--
 Run with `--verbose` and paste the relevant tail. The output is safe to
