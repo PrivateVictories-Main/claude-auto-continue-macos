@@ -60,11 +60,21 @@ class ActivityLog:
             f"uptime={uptime_seconds:.0f}s) ==="
         )
 
-    def auto_continue(self, count: int) -> None:
-        self._write(f"Auto-continue #{count} triggered")
+    def auto_continue(self, count: int, *, surface: str = "", source: str = "") -> None:
+        parts = [f"Auto-continue #{count} triggered"]
+        if surface:
+            parts.append(f"surface={surface}")
+        if source:
+            parts.append(f"source={source}")
+        self._write(" | ".join(parts))
 
-    def dry_run_hit(self, count: int) -> None:
-        self._write(f"[DRY RUN] Auto-continue #{count} would have triggered")
+    def dry_run_hit(self, count: int, *, surface: str = "", source: str = "") -> None:
+        parts = [f"[DRY RUN] Auto-continue #{count} would have triggered"]
+        if surface:
+            parts.append(f"surface={surface}")
+        if source:
+            parts.append(f"source={source}")
+        self._write(" | ".join(parts))
 
     def note(self, message: str) -> None:
         self._write(message)

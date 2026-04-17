@@ -166,6 +166,7 @@ claude-auto-continue [--setup]
                      [--silent] [--no-notifications]
                      [--max-continues N] [--no-log] [--verbose]
                      [--no-app] [--no-browsers] [--terminals]
+                     [--menu-bar]
                      [--no-dashboard] [--dashboard-port PORT]
                      [--config PATH] [--version]
 ```
@@ -186,6 +187,7 @@ claude-auto-continue [--setup]
 | `--no-app` | off | Don't scan the native Claude desktop app. |
 | `--no-browsers` | off | Don't scan browsers for claude.ai tabs. |
 | `--terminals` | off | **Also** scan terminal apps for Claude Code CLI pauses. Opt-in because this sends Return keystrokes. |
+| `--menu-bar` | off | Show a status icon in the macOS menu bar (green/yellow/red dot) with live state, continue count, and quick actions. |
 | `--no-dashboard` | off | Disable the localhost control dashboard. |
 | `--dashboard-port PORT` | `8787` | Port for the dashboard (127.0.0.1 only). |
 | `--config PATH` | `~/.claude-auto-continue/config.toml` | Use a custom TOML config file. |
@@ -265,6 +267,25 @@ you had running.
 
 ---
 
+## Menu bar status icon
+
+```bash
+claude-auto-continue --menu-bar
+```
+
+Adds a small coloured dot to your macOS menu bar:
+
+- **Green** — watching (Claude detected, scanning)
+- **Yellow** — waiting for Claude to appear
+- **Red** — error or permissions issue
+- **Gray** — initializing
+
+Click the dot for a dropdown showing live status, uptime, continue count,
+and quick actions (open dashboard, quit). The menu bar icon runs alongside
+the normal CLI output and dashboard — all three work together.
+
+---
+
 ## Run it as a background service (LaunchAgent)
 
 If you want the tool to run 24/7 — auto-start on login, survive reboots,
@@ -307,6 +328,30 @@ tail -f ~/.claude-auto-continue/launchd.out.log
 
 # Stop + uninstall
 ./scripts/uninstall-launchagent.sh
+```
+
+---
+
+## Uninstalling
+
+```bash
+# Interactive — confirms before each step
+./scripts/uninstall.sh
+
+# Non-interactive — removes everything
+./scripts/uninstall.sh --force
+```
+
+Handles all install methods (Homebrew, curl|bash, manual). Removes the
+LaunchAgent, Homebrew formula, shell aliases, and optionally the data
+directory (`~/.claude-auto-continue/` with logs, config, and cache).
+
+Or if you installed via Homebrew only:
+
+```bash
+brew services stop claude-auto-continue
+brew uninstall claude-auto-continue
+brew untap PrivateVictories-Main/tap  # optional
 ```
 
 ---
@@ -476,7 +521,10 @@ Honesty section:
 - [x] Homebrew formula — `brew install PrivateVictories-Main/tap/claude-auto-continue` (v0.6.0)
 - [x] One-liner install script — `curl | bash` (v0.6.0)
 - [x] `brew services start` for LaunchAgent management (v0.6.0)
-- [ ] Optional menu bar companion icon with status
+- [x] Menu bar status icon with `--menu-bar` (v0.7.0)
+- [x] Uninstall script for all install methods (v0.7.0)
+- [x] Activity log surface tracking — desktop-app/browser/terminal (v0.7.0)
+- [x] GitHub Actions CI (v0.7.0)
 - [ ] Windows support via UI Automation API
 - [ ] Optional auto-update check
 
