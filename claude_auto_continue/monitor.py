@@ -321,14 +321,13 @@ class Monitor:
         )
 
         if s.dry_run:
-            ui.status.total_continues += 1
-            ui.status.last_continue_at = time.monotonic()
+            total = ui.status.increment_continues()
             self._last_click_at = time.monotonic()
             msg = f"[DRY RUN] Would have sent Return to {source}"
             ui.warn(msg)
             self._emit("warn", msg)
             self.ctx.log.dry_run_hit(
-                ui.status.total_continues, surface="terminal", source=source
+                total, surface="terminal", source=source
             )
             return True
 
@@ -339,10 +338,8 @@ class Monitor:
             self._emit("error", msg)
             return True
 
-        ui.status.total_continues += 1
-        ui.status.last_continue_at = time.monotonic()
+        total = ui.status.increment_continues()
         self._last_click_at = time.monotonic()
-        total = ui.status.total_continues
         msg = f"auto-continued #{total} — sent Return to {source}"
         ui.success(msg)
         self._emit("success", msg)
@@ -377,14 +374,13 @@ class Monitor:
         settings = self.ctx.settings
 
         if settings.dry_run:
-            ui.status.total_continues += 1
-            ui.status.last_continue_at = time.monotonic()
+            total = ui.status.increment_continues()
             self._last_click_at = time.monotonic()
             msg = f"[DRY RUN] Would have clicked {label!r} in {source}"
             ui.warn(msg)
             self._emit("warn", msg)
             self.ctx.log.dry_run_hit(
-                ui.status.total_continues, surface=surface, source=source
+                total, surface=surface, source=source
             )
             return
 
@@ -395,10 +391,8 @@ class Monitor:
             self._emit("error", msg)
             return
 
-        ui.status.total_continues += 1
-        ui.status.last_continue_at = time.monotonic()
+        total = ui.status.increment_continues()
         self._last_click_at = time.monotonic()
-        total = ui.status.total_continues
         msg = f"auto-continued #{total} — pressed {label!r} in {source}"
         ui.success(msg)
         self._emit("success", msg)

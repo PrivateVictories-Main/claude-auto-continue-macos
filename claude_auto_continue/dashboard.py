@@ -129,6 +129,15 @@ class SharedState:
         with self._lock:
             return asdict(self.settings)
 
+    _NUMERIC_FIELDS = {"interval", "cooldown", "max_continues"}
+    _BOOL_FIELDS = {
+        "silent", "notifications", "log", "verbose", "dry_run",
+        "scan_app", "scan_browsers", "scan_terminals",
+    }
+    _TUPLE_FIELDS = {
+        "terminal_patterns", "extra_continue_labels", "extra_context_keywords",
+    }
+
     def update_settings(self, patch: dict[str, Any]) -> dict[str, Any]:
         applied: dict[str, Any] = {}
         with self._lock:
@@ -136,12 +145,20 @@ class SharedState:
             for key, value in patch.items():
                 if key not in self._SETTABLE_FIELDS:
                     continue
-                if key == "terminal_patterns" and isinstance(value, list):
-                    value = tuple(value)
+                if key in self._NUMERIC_FIELDS:
+                    if isinstance(value, bool) or not isinstance(value, (int, float)):
+                        continue
+                elif key in self._BOOL_FIELDS:
+                    if not isinstance(value, bool):
+                        continue
+                elif key in self._TUPLE_FIELDS:
+                    if isinstance(value, list):
+                        value = tuple(str(v) for v in value if isinstance(v, str))
+                    else:
+                        continue
                 setattr(new, key, value)
                 applied[key] = value
             new.validate()
-            # Only commit if validate passed.
             for key, value in applied.items():
                 setattr(self.settings, key, value)
         if applied and self.on_settings_change:
@@ -177,6 +194,16 @@ class _Handler(BaseHTTPRequestHandler):
 
     # ----- routing -----------------------------------------------------
 
+    def do_OPTIONS(self) -> None:  # noqa: N802
+        self.send_response(204)
+        self._cors_headers()
+        self.end_headers()
+
+    def _cors_headers(self) -> None:
+        self.send_header("Access-Control-Allow-Origin", "http://127.0.0.1")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+
     def do_GET(self) -> None:  # noqa: N802 (stdlib naming)
         path = self.path.split("?", 1)[0]
         if path == "/":
@@ -197,6 +224,9 @@ class _Handler(BaseHTTPRequestHandler):
             return
 
         length = int(self.headers.get("Content-Length") or 0)
+        if length > 65_536:
+            self.send_error(413, "request body too large (64KB max)")
+            return
         raw = self.rfile.read(length) if length else b""
         try:
             patch = json.loads(raw.decode("utf-8") or "{}")

@@ -525,8 +525,88 @@ Honesty section:
 - [x] Uninstall script for all install methods (v0.7.0)
 - [x] Activity log surface tracking — desktop-app/browser/terminal (v0.7.0)
 - [x] GitHub Actions CI (v0.7.0)
+- [x] Thread-safe counter increments (v0.7.1)
+- [x] Dashboard input validation and type checking (v0.7.1)
+- [x] Remote pattern fetch with retry (v0.7.1)
+- [x] 273 unit tests across 8 test files (v0.7.1)
 - [ ] Windows support via UI Automation API
 - [ ] Optional auto-update check
+
+---
+
+## Troubleshooting
+
+### "Accessibility permission missing" on every launch
+
+The Python interpreter running `claude-auto-continue` needs Accessibility
+permission — not just your terminal app.
+
+1. Run `claude-auto-continue --setup` for an interactive walkthrough.
+2. If using Homebrew: grant permission to
+   `/opt/homebrew/opt/python@3.12/bin/python3.12`.
+3. If using the venv/pip install: grant permission to the Python shown by
+   `which python3` inside the venv.
+4. After granting, **quit and reopen your terminal** (macOS caches
+   permission state for the life of the process).
+
+### Claude app is running but "Waiting for Claude" stays yellow
+
+- Electron disables Accessibility by default.
+  `claude-auto-continue` flips `AXManualAccessibility` on when it first
+  sees Claude, but if Claude restarted since then, the PID changed and
+  the flag needs re-setting. The monitor handles this automatically —
+  wait one poll cycle.
+- If it persists, run with `--verbose` and look for `AX=False` in the
+  output. This means the `AXUIElementSetAttributeValue` call failed —
+  usually a permission issue.
+
+### Browser tabs not detected
+
+- Chromium browsers require `AXEnhancedUserInterface=True` on the
+  process. The scanner sets this automatically, but some browsers reset
+  it. Run with `--verbose` to confirm `AX enable=ok` for each browser.
+- Only `claude.ai` URLs are scanned. If Anthropic moves to a new
+  domain, add it via `browser_hosts` in
+  `~/.claude-auto-continue/config.toml` or in the remote
+  `patterns.json`.
+
+### Terminal scanner clicks Return in the wrong app
+
+Terminal scanning sends Return to the **frontmost** app only. If Claude
+Code is paused but a different app is in front, the scanner correctly
+does nothing. If you experience misfires, disable with `--no-terminals`
+(or remove `scan_terminals = true` from your config) and file an issue
+with `--verbose` output.
+
+### LaunchAgent won't start / crashes on login
+
+```bash
+# Check status
+launchctl list | grep claude-auto-continue
+
+# View logs
+tail -50 ~/.claude-auto-continue/launchd.out.log
+tail -50 ~/.claude-auto-continue/launchd.err.log
+
+# Reload
+launchctl unload ~/Library/LaunchAgents/com.*.claude-auto-continue.plist
+launchctl load ~/Library/LaunchAgents/com.*.claude-auto-continue.plist
+```
+
+Common cause: the Python path in the plist is stale (you reinstalled
+Python or moved the venv). Run `claude-auto-continue --setup` to
+regenerate the plist.
+
+### Dashboard won't open / port already in use
+
+The dashboard binds to `127.0.0.1:8787` by default and auto-falls back
+to ports 8788-8792. If all are taken:
+
+```bash
+claude-auto-continue --dashboard-port 9000
+```
+
+Or disable it: `claude-auto-continue --no-dashboard`.
 
 ---
 

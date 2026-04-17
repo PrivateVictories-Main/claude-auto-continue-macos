@@ -87,15 +87,28 @@ def _write_cache(data: dict[str, Any]) -> None:
         pass
 
 
-def _fetch_remote() -> Optional[dict[str, Any]]:
-    try:
-        req = Request(REMOTE_URL, headers={"User-Agent": "claude-auto-continue"})
-        with urlopen(req, timeout=FETCH_TIMEOUT_SECONDS) as resp:
-            if resp.status != 200:
-                return None
-            return json.loads(resp.read().decode("utf-8"))
-    except (URLError, OSError, json.JSONDecodeError, Exception):
-        return None
+MAX_RETRIES = 2
+RETRY_DELAY_SECONDS = 1.0
+
+
+def _fetch_remote(verbose_cb=None) -> Optional[dict[str, Any]]:
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            req = Request(REMOTE_URL, headers={"User-Agent": "claude-auto-continue"})
+            with urlopen(req, timeout=FETCH_TIMEOUT_SECONDS) as resp:
+                if resp.status != 200:
+                    return None
+                return json.loads(resp.read().decode("utf-8"))
+        except (URLError, OSError, json.JSONDecodeError):
+            if attempt < MAX_RETRIES:
+                if verbose_cb:
+                    verbose_cb(f"remote patterns: fetch attempt {attempt} failed, retrying")
+                time.sleep(RETRY_DELAY_SECONDS)
+                continue
+            return None
+        except Exception:
+            return None
+    return None
 
 
 def fetch(verbose_cb=None) -> RemotePatterns:
@@ -113,7 +126,7 @@ def fetch(verbose_cb=None) -> RemotePatterns:
 
     if verbose_cb:
         verbose_cb(f"remote patterns: fetching from {REMOTE_URL}")
-    data = _fetch_remote()
+    data = _fetch_remote(verbose_cb=verbose_cb)
     if data is None:
         if verbose_cb:
             verbose_cb("remote patterns: fetch failed, using built-in only")
