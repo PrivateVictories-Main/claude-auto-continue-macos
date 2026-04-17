@@ -35,16 +35,25 @@ dependencies = [
     "tomli>=2.0;python_version<'3.11'",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
 [project.scripts]
 claude-auto-continue = "claude_auto_continue.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/PrivateVictories-Main/claude-auto-continue-macos"
 Issues = "https://github.com/PrivateVictories-Main/claude-auto-continue-macos/issues"
+Changelog = "https://github.com/PrivateVictories-Main/claude-auto-continue-macos/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 include = ["claude_auto_continue*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]
-claude_auto_continue = ["dashboard_ui.html"]
+claude_auto_continue = ["dashboard_ui.html", "py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
