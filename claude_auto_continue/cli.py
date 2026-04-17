@@ -144,6 +144,16 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--menu-bar",
+        dest="menu_bar",
+        action="store_true",
+        default=False,
+        help=(
+            "Show a status icon in the macOS menu bar with live state, "
+            "continue count, and quick actions."
+        ),
+    )
+    parser.add_argument(
         "--no-dashboard",
         dest="dashboard",
         action="store_false",
@@ -320,21 +330,61 @@ def main(argv: Optional[list[str]] = None) -> int:
         dry_run=settings.dry_run,
     )
 
-    try:
-        monitor.run()
-    finally:
-        ui.stop_dashboard()
+    menu_bar = None
+    if args.menu_bar:
+        from .menubar import MenuBar
+        menu_bar = MenuBar(quit_callback=lambda: _request_stop(None, None))
         if dashboard is not None:
-            try:
-                dashboard.stop()
-            except Exception:
-                pass
-        log.session_end(
-            total=ui.status.total_continues,
-            uptime_seconds=ui.status.uptime(),
-        )
-        log.close()
-        ui.print_summary()
+            menu_bar.set_dashboard_url(dashboard.url)
+
+    def _run_monitor():
+        try:
+            monitor.run()
+        finally:
+            ui.stop_dashboard()
+            if dashboard is not None:
+                try:
+                    dashboard.stop()
+                except Exception:
+                    pass
+            log.session_end(
+                total=ui.status.total_continues,
+                uptime_seconds=ui.status.uptime(),
+            )
+            log.close()
+            ui.print_summary()
+            if menu_bar is not None:
+                menu_bar.stop()
+
+    if menu_bar is not None:
+        import threading
+
+        def _menu_bar_sync():
+            """Push monitor state into the menu bar every second."""
+            while not stopped["value"]:
+                status = ui.status
+                color_map = {
+                    "green": "green",
+                    "yellow": "yellow",
+                    "red": "red",
+                }
+                color = color_map.get(status.state_style, "gray")
+                menu_bar.update(
+                    color=color,
+                    label=status.state,
+                    continues=status.total_continues,
+                    dry_run=status.dry_run,
+                )
+                import time
+                time.sleep(1.0)
+
+        monitor_thread = threading.Thread(target=_run_monitor, daemon=True)
+        sync_thread = threading.Thread(target=_menu_bar_sync, daemon=True)
+        monitor_thread.start()
+        sync_thread.start()
+        menu_bar.run()
+    else:
+        _run_monitor()
 
     return 0
 

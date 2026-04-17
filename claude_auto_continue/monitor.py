@@ -236,6 +236,7 @@ class Monitor:
             element=target.element,
             label=target.label,
             source=f"Claude app window {target.window_index}",
+            surface="desktop-app",
         )
         return True
 
@@ -284,6 +285,7 @@ class Monitor:
                 element=target.element,
                 label=target.label,
                 source=f"{target.browser_name} — {target.url}",
+                surface="browser",
             )
             return True
         return False
@@ -325,7 +327,9 @@ class Monitor:
             msg = f"[DRY RUN] Would have sent Return to {source}"
             ui.warn(msg)
             self._emit("warn", msg)
-            self.ctx.log.dry_run_hit(ui.status.total_continues)
+            self.ctx.log.dry_run_hit(
+                ui.status.total_continues, surface="terminal", source=source
+            )
             return True
 
         ok = term.send_return_to(target.terminal_pid)
@@ -342,7 +346,7 @@ class Monitor:
         msg = f"auto-continued #{total} — sent Return to {source}"
         ui.success(msg)
         self._emit("success", msg)
-        self.ctx.log.auto_continue(total)
+        self.ctx.log.auto_continue(total, surface="terminal", source=source)
         self.ctx.notifier.announce_continue(total, label=target.matched_pattern)
         self._fast_followup = True
         return True
@@ -367,6 +371,7 @@ class Monitor:
         element,
         label: str,
         source: str,
+        surface: str = "app",
     ) -> None:
         ui = self.ctx.ui
         settings = self.ctx.settings
@@ -378,7 +383,9 @@ class Monitor:
             msg = f"[DRY RUN] Would have clicked {label!r} in {source}"
             ui.warn(msg)
             self._emit("warn", msg)
-            self.ctx.log.dry_run_hit(ui.status.total_continues)
+            self.ctx.log.dry_run_hit(
+                ui.status.total_continues, surface=surface, source=source
+            )
             return
 
         ok = ax.press(element)
@@ -395,7 +402,7 @@ class Monitor:
         msg = f"auto-continued #{total} — pressed {label!r} in {source}"
         ui.success(msg)
         self._emit("success", msg)
-        self.ctx.log.auto_continue(total)
+        self.ctx.log.auto_continue(total, surface=surface, source=source)
         self.ctx.notifier.announce_continue(total, label=label)
         # Some flows surface a second Continue immediately after the
         # first (consecutive tool-use limits). Re-scan fast.
