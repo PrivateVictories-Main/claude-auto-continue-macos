@@ -529,6 +529,9 @@ Honesty section:
 - [x] Dashboard input validation and type checking (v0.7.1)
 - [x] Remote pattern fetch with retry (v0.7.1)
 - [x] 273 unit tests across 8 test files (v0.7.1)
+- [x] Regex caching for terminal scanner performance (v0.7.2)
+- [x] Dashboard CSP, CORS, and keyboard accessibility (v0.7.2)
+- [x] 341 unit tests across 12 test files (v0.7.2)
 - [ ] Windows support via UI Automation API
 - [ ] Optional auto-update check
 
