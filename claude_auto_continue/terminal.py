@@ -86,20 +86,44 @@ FRONTMOST_EXCLUDE_BUNDLES = frozenset({
 _looks_like_browser = br.looks_like_browser
 
 
-# Patterns that unambiguously identify a Claude Code tool-use-limit pause.
-# We match on any of these as a substring (case-insensitive). If this list
-# grows stale with a Claude Code release, users can extend it via
-# ``terminal_patterns`` in ~/.claude-auto-continue/config.toml.
+# Patterns that identify a Claude Code tool-use-limit pause. Plain strings
+# are matched as case-insensitive substrings; entries starting with "re:"
+# are compiled as regex (case-insensitive). If this list grows stale with
+# a Claude Code release, users can extend it via ``terminal_patterns`` in
+# ~/.claude-auto-continue/config.toml or the remote patterns.json.
 CLAUDE_CODE_PAUSE_PATTERNS: tuple[str, ...] = (
+    # Explicit prompts
     "press enter to continue",
     "press [enter] to continue",
+    "press return to continue",
+    "hit enter to continue",
+    "hit return to continue",
+    # y/n confirmations
     "continue? (y/n)",
     "continue? [y/n]",
+    "continue? (y)",
+    "continue? [y]",
+    "do you want to continue",
+    "would you like to continue",
+    # Tool-use limit phrasing (current and anticipated)
     "tool-use limit reached",
     "tool use limit reached",
+    "tool-use limit",
+    "tool use limit",
+    "reached its limit",
+    "reached the limit",
+    "usage limit",
+    # Pause / resume phrasing
     "claude code paused",
     "claude code has paused",
     "resume this session",
+    "session paused",
+    "waiting for confirmation",
+    # Regex patterns for flexible matching
+    r"re:press\s+\[?(?:enter|return)\]?\s+to\s+continue",
+    r"re:continue\?\s*[\(\[]\s*[yn]",
+    r"re:tool[\s-]use\s+limit",
+    r"re:(?:paused|waiting).*continue",
 )
 
 # Virtual key code for Return — the keystroke we synthesise on a match.
@@ -212,7 +236,13 @@ def _match_pattern(text: str, patterns: Iterable[str]) -> Optional[str]:
     for p in patterns:
         if not p:
             continue
-        if p.lower() in lowered:
+        if p.startswith("re:"):
+            try:
+                if re.search(p[3:], lowered):
+                    return p
+            except re.error:
+                continue
+        elif p.lower() in lowered:
             return p
     return None
 

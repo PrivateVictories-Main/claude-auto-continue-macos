@@ -1,0 +1,11 @@
+{
+  "_comment": "Remote pattern overrides. Fetched by the agent on startup so new labels/patterns work without a code update. Merge semantics: remote lists are ADDED to built-in lists, never replace them.",
+  "version": 1,
+  "continue_labels": [],
+  "context_keywords": [],
+  "terminal_patterns": [],
+  "browser_hosts": [],
+  "claude_bundle_ids": [],
+  "browser_bundle_ids": [],
+  "browser_heuristic_tokens": []
+}

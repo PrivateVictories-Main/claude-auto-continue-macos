@@ -54,20 +54,39 @@ TOOL_USE_CONTEXT_KEYWORDS = (
     "reached its limit",
     "reached the limit",
     "limit reached",
+    "usage limit",
+    "rate limit",
     "continue with tool",
     "continue using tools",
     "pause",
     "paused",
+    "waiting for confirmation",
+    "session paused",
+    "generation paused",
+    "conversation paused",
 )
 
 CONTINUE_LABELS = (
     "continue",
     "continue with tool use",
     "continue generation",
+    "continue generating",
+    "continue conversation",
+    "continue session",
+    "continue chat",
     "resume",
     "resume generation",
+    "resume generating",
+    "resume conversation",
+    "resume session",
+    "resume chat",
     "keep going",
     "proceed",
+    "retry",
+    "try again",
+    "yes, continue",
+    "yes continue",
+    "confirm",
 )
 
 # Maximum tree depth we will traverse. Claude is an Electron app whose
@@ -252,8 +271,8 @@ def _looks_like_continue(label: str, extra_labels: tuple[str, ...] = ()) -> bool
     all_labels = CONTINUE_LABELS + extra_labels
     if lower in all_labels:
         return True
-    for prefix in ("continue", "resume"):
-        if lower.startswith(prefix) and len(lower) <= 40:
+    for prefix in ("continue", "resume", "proceed", "keep going", "retry", "try again"):
+        if lower.startswith(prefix) and len(lower) <= 50:
             return True
     return False
 

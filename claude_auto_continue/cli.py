@@ -17,6 +17,7 @@ from .logger import ActivityLog, DEFAULT_HOME
 from .monitor import Monitor, MonitorContext
 from .notifications import Notifier
 from .permissions import detect_terminal, has_permission, setup_instructions
+from .remote_patterns import RemotePatterns, fetch as fetch_remote_patterns
 from .ui import TerminalUI
 
 
@@ -255,6 +256,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     ui.show_banner()
     _first_run_notice(ui)
 
+    verbose_cb = ui.debug if settings.verbose else None
+    remote = fetch_remote_patterns(verbose_cb=verbose_cb)
+    if remote.source != "none" and remote.source != "fetch-failed":
+        ui.info(f"remote patterns loaded ({remote.source})")
+
     notifier = Notifier(
         sound=not settings.silent,
         notifications=settings.notifications,
@@ -303,6 +309,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         log=log,
         stop=lambda: stopped["value"],
         state=shared_state,
+        remote=remote,
     )
     monitor = Monitor(ctx)
 

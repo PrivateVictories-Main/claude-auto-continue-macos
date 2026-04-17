@@ -26,6 +26,7 @@ from . import terminal as term
 from .config import Settings
 from .logger import ActivityLog
 from .notifications import Notifier
+from .remote_patterns import RemotePatterns
 from .ui import TerminalUI
 
 
@@ -37,6 +38,11 @@ class MonitorContext:
     log: ActivityLog
     stop: Callable[[], bool]
     state: Optional[object] = None  # dashboard.SharedState, optional
+    remote: RemotePatterns = None  # type: ignore[assignment]
+
+    def __post_init__(self):
+        if self.remote is None:
+            self.remote = RemotePatterns()
 
 
 class Monitor:
@@ -198,13 +204,15 @@ class Monitor:
             self._fast_followup = True
 
         verbose_cb = ui.debug if self.ctx.settings.verbose else None
-        # The Claude app IS the context — no need to require tool-use-
-        # limit keywords. This makes detection immune to Anthropic
-        # rewording the limit text in future updates.
+        remote = self.ctx.remote
+        extra_labels = (
+            self.ctx.settings.extra_continue_labels + remote.continue_labels
+        )
         candidates = ax.find_continue_buttons(
             app,
             verbose_cb=verbose_cb,
             require_context=False,
+            extra_labels=extra_labels,
         )
 
         if candidates or self._tick_count % 20 == 0:
@@ -242,7 +250,7 @@ class Monitor:
         for b in browsers:
             if b.pid not in self._seen_browser_pids:
                 ok = br.enable_enhanced_ax(b)
-                if ui.verbose:
+                if self.ctx.settings.verbose:
                     ui.debug(
                         f"browser {b.name} (pid {b.pid}) AX enable={'ok' if ok else 'fail'}"
                     )
@@ -250,11 +258,19 @@ class Monitor:
         # Drop pids that have quit so a relaunched browser gets re-seeded.
         self._seen_browser_pids &= current_pids
 
-        verbose_cb = ui.debug if ui.verbose else None
+        verbose_cb = ui.debug if self.ctx.settings.verbose else None
+        remote = self.ctx.remote
+        extra_labels = (
+            self.ctx.settings.extra_continue_labels + remote.continue_labels
+        )
+        extra_hosts = remote.browser_hosts
         for b in browsers:
             try:
                 candidates = br.find_browser_continue_buttons(
-                    b, verbose_cb=verbose_cb
+                    b,
+                    verbose_cb=verbose_cb,
+                    extra_labels=extra_labels,
+                    extra_hosts=extra_hosts,
                 )
             except Exception as exc:
                 ui.error(f"browser scan error ({b.name}): {exc!r}")
@@ -277,10 +293,14 @@ class Monitor:
     def _scan_terminals(self) -> bool:
         ui = self.ctx.ui
         s = self.ctx.settings
-        verbose_cb = ui.debug if ui.verbose else None
+        verbose_cb = ui.debug if self.ctx.settings.verbose else None
+        remote = self.ctx.remote
+        extra_patterns = (
+            (s.terminal_patterns or ()) + remote.terminal_patterns
+        )
         try:
             candidates = term.find_terminal_candidates(
-                extra_patterns=s.terminal_patterns or (),
+                extra_patterns=extra_patterns,
                 verbose_cb=verbose_cb,
             )
         except Exception as exc:

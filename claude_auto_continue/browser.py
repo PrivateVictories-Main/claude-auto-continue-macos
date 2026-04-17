@@ -12,7 +12,8 @@ Approach:
   the `AXURL` attribute on an AXWebArea-like node. Skip subtrees whose URL
   is not a claude.ai origin.
 * Within a claude.ai subtree, reuse the Continue-button heuristic from
-  `accessibility.py` (Continue-looking label + tool-use-limit context).
+  `accessibility.py`. No context-keyword gate — the URL filter already
+  scopes to Claude pages, making detection immune to UI text changes.
 
 We press found buttons via AXPress, same as the native-app path.
 """
@@ -178,12 +179,16 @@ def enable_enhanced_ax(browser: BrowserApp) -> bool:
 
 
 def _is_claude_url(url: str) -> bool:
+    return _is_claude_url_ext(url, CLAUDE_HOSTS)
+
+
+def _is_claude_url_ext(url: str, hosts: tuple[str, ...]) -> bool:
     try:
         host = urlparse(url).hostname or ""
     except Exception:
         return False
     host = host.lower()
-    return any(host == h or host.endswith("." + h) for h in CLAUDE_HOSTS)
+    return any(host == h or host.endswith("." + h) for h in hosts)
 
 
 def _read_url(element) -> Optional[str]:
@@ -217,8 +222,16 @@ def _iter_web_subtrees(root) -> Iterable[tuple[object, str]]:
 def find_browser_continue_buttons(
     browser: BrowserApp,
     verbose_cb: Optional[Callable[[str], None]] = None,
+    *,
+    extra_labels: tuple[str, ...] = (),
+    extra_hosts: tuple[str, ...] = (),
 ) -> list[BrowserCandidate]:
-    """Return Continue candidates inside claude.ai tabs of this browser."""
+    """Return Continue candidates inside claude.ai tabs of this browser.
+
+    No context-keyword gate — the URL filter already scopes to Claude
+    pages, making detection immune to Anthropic rewording limit text.
+    """
+    all_hosts = CLAUDE_HOSTS + extra_hosts
     found: list[BrowserCandidate] = []
     windows = ax.get_windows(browser)
 
@@ -236,7 +249,7 @@ def find_browser_continue_buttons(
             continue
 
         for web_root, url in web_roots:
-            if not url or not _is_claude_url(url):
+            if not url or not _is_claude_url_ext(url, all_hosts):
                 if verbose_cb and url:
                     verbose_cb(f"    skip non-claude tab: {url}")
                 continue
@@ -244,25 +257,14 @@ def find_browser_continue_buttons(
             if verbose_cb:
                 verbose_cb(f"    scan claude tab: {url}")
 
-            has_context = False
-            continue_buttons: list[tuple[object, str, str]] = []
-
             for node, _depth in ax.walk(web_root,
                                         max_depth=ax.MAX_RECURSION_DEPTH):
                 role = ax._element_role(node)
                 label = ax._element_label(node)
 
-                if ax._is_button(role) and ax._looks_like_continue(label):
-                    continue_buttons.append((node, label, role))
-
-                if not has_context and label:
-                    lowered = label.lower()
-                    if any(kw in lowered
-                           for kw in ax.TOOL_USE_CONTEXT_KEYWORDS):
-                        has_context = True
-
-            if has_context and continue_buttons:
-                for node, label, _role in continue_buttons:
+                if ax._is_button(role) and ax._looks_like_continue(
+                    label, extra_labels
+                ):
                     found.append(BrowserCandidate(
                         element=node,
                         label=label,
@@ -270,10 +272,5 @@ def find_browser_continue_buttons(
                         browser_pid=browser.pid,
                         url=url,
                     ))
-            elif continue_buttons and verbose_cb:
-                verbose_cb(
-                    f"    found Continue button in {url} but no "
-                    "tool-use-limit context — skipping"
-                )
 
     return found
