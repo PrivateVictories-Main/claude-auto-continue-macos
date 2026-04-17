@@ -26,6 +26,7 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Callable, Iterable, Optional
 
 from ApplicationServices import (
@@ -229,6 +230,14 @@ def _gather_visible_text(root) -> str:
     return "\n".join(parts)
 
 
+@lru_cache(maxsize=64)
+def _compile_regex(pattern: str) -> Optional[re.Pattern[str]]:
+    try:
+        return re.compile(pattern)
+    except re.error:
+        return None
+
+
 def _match_pattern(text: str, patterns: Iterable[str]) -> Optional[str]:
     if not text:
         return None
@@ -237,11 +246,9 @@ def _match_pattern(text: str, patterns: Iterable[str]) -> Optional[str]:
         if not p:
             continue
         if p.startswith("re:"):
-            try:
-                if re.search(p[3:], lowered):
-                    return p
-            except re.error:
-                continue
+            compiled = _compile_regex(p[3:])
+            if compiled is not None and compiled.search(lowered):
+                return p
         elif p.lower() in lowered:
             return p
     return None

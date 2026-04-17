@@ -37,8 +37,8 @@ class MonitorContext:
     notifier: Notifier
     log: ActivityLog
     stop: Callable[[], bool]
-    state: Optional[object] = None  # dashboard.SharedState, optional
-    remote: RemotePatterns = None  # type: ignore[assignment]
+    state: Optional[object] = None
+    remote: Optional[RemotePatterns] = None
 
     def __post_init__(self):
         if self.remote is None:

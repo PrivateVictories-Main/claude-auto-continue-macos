@@ -143,3 +143,17 @@ class TestEdgeCases:
     def test_pattern_embedded_in_long_text(self):
         long_text = "x" * 5000 + " press enter to continue " + "x" * 5000
         assert _match_pattern(long_text, CLAUDE_CODE_PAUSE_PATTERNS) is not None
+
+
+class TestRegexCaching:
+    """Verify that compiled regex patterns are reused across calls."""
+
+    def test_cached_regex_matches_consistently(self):
+        pattern = ("re:press\\s+enter",)
+        assert _match_pattern("press  enter to continue", pattern) is not None
+        assert _match_pattern("press  enter to continue", pattern) is not None
+
+    def test_invalid_regex_cached_as_none(self):
+        from claude_auto_continue.terminal import _compile_regex
+        assert _compile_regex("[invalid") is None
+        assert _compile_regex("[invalid") is None
