@@ -9,6 +9,7 @@ while the dashboard stays pinned.
 
 from __future__ import annotations
 
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -75,6 +76,7 @@ class Status:
     ax_enabled: bool = False
     dry_run: bool = False
     notes: str = ""
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def uptime(self) -> float:
         return time.monotonic() - self.started_at
@@ -83,6 +85,12 @@ class Status:
         if self.last_continue_at is None:
             return None
         return time.monotonic() - self.last_continue_at
+
+    def increment_continues(self) -> int:
+        with self._lock:
+            self.total_continues += 1
+            self.last_continue_at = time.monotonic()
+            return self.total_continues
 
 
 class TerminalUI:
