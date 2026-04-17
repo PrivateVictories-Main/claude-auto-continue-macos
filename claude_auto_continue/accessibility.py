@@ -82,8 +82,6 @@ CONTINUE_LABELS = (
     "resume chat",
     "keep going",
     "proceed",
-    "retry",
-    "try again",
     "yes, continue",
     "yes continue",
     "confirm",
@@ -271,7 +269,7 @@ def _looks_like_continue(label: str, extra_labels: tuple[str, ...] = ()) -> bool
     all_labels = CONTINUE_LABELS + extra_labels
     if lower in all_labels:
         return True
-    for prefix in ("continue", "resume", "proceed", "keep going", "retry", "try again"):
+    for prefix in ("continue", "resume", "proceed", "keep going"):
         if lower.startswith(prefix) and len(lower) <= 50:
             return True
     return False
