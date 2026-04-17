@@ -1,11 +1,9 @@
 """Tests for dashboard module — SharedState, EventBus, settings mutation."""
 
-import json
-import queue
-import time
 import threading
 
 import pytest
+
 from claude_auto_continue.config import Settings
 from claude_auto_continue.dashboard import EventBus, SharedState
 
@@ -113,6 +111,7 @@ class TestSharedState:
 
     def test_update_settings_callback(self):
         called = {}
+
         def on_change(s):
             called["settings"] = s
 

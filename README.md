@@ -193,6 +193,7 @@ claude-auto-continue [--setup]
 | `--dashboard-port PORT` | `8787` | Port for the dashboard (127.0.0.1 only). |
 | `--dashboard-host HOST` | `127.0.0.1` | Bind address for the dashboard. |
 | `--no-update-check` | off | Skip the background check for newer versions on PyPI. |
+| `--check` | — | Quick health check: report permission, Claude detection, config validity, LaunchAgent status. Exits 0 if healthy, 1 if issues found. |
 | `--config PATH` | `~/.claude-auto-continue/config.toml` | Use a custom TOML config file. |
 | `--version` | — | Print version and exit. |
 
@@ -225,6 +226,9 @@ claude-auto-continue --max-continues 10
 
 # Debugging a button-text change in a new Claude release.
 claude-auto-continue --verbose --dry-run
+
+# Health check — verify permission, Claude detection, config, LaunchAgent.
+claude-auto-continue --check
 ```
 
 ---
@@ -362,7 +366,12 @@ brew untap PrivateVictories-Main/tap  # optional
 ## Configuration file
 
 Drop a TOML file at `~/.claude-auto-continue/config.toml` to set defaults
-for any flag. CLI arguments always win.
+for any flag. CLI arguments always win. A fully-commented example is
+included in the repo:
+
+```bash
+cp config.example.toml ~/.claude-auto-continue/config.toml
+```
 
 ```toml
 # ~/.claude-auto-continue/config.toml
@@ -536,6 +545,11 @@ Honesty section:
 - [x] Dashboard CSP, CORS, and keyboard accessibility (v0.7.2)
 - [x] 354 unit tests across 14 test files (v0.7.2)
 - [x] Background auto-update check against PyPI (v0.7.2)
+- [x] `--check` health check mode (v0.7.4)
+- [x] Activity log rotation at 5 MB (v0.7.4)
+- [x] Ruff linting + formatting in CI (v0.7.4)
+- [x] Example config file (`config.example.toml`) (v0.7.4)
+- [x] 359+ tests across 15 test files (v0.7.4)
 - [ ] Windows support via UI Automation API
 
 ---

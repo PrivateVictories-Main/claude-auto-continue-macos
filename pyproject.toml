@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "claude-auto-continue-macos"
-version = "0.7.3"
+version = "0.7.4"
 description = "Automatically click the 'Continue' button in the Claude macOS desktop app when tool-use limits pause your session."
 readme = "README.md"
 license = { text = "MIT" }
@@ -38,6 +38,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "ruff>=0.4",
 ]
 
 [project.scripts]
@@ -57,3 +58,26 @@ claude_auto_continue = ["dashboard_ui.html", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "N"]
+ignore = [
+    "E501",    # line length handled by formatter
+    "N802",    # stdlib naming (do_GET, do_POST)
+    "N803",    # argument naming (AX constants)
+    "N806",    # dynamic class naming (BoundHandler)
+    "UP007",   # Optional[X] vs X | None — keep for 3.9 compat
+    "UP012",   # unnecessary encoding="utf-8" — explicit is fine
+    "UP035",   # import from collections.abc — keep typing imports for clarity
+    "UP045",   # X | None — keep Optional for 3.9 readability
+    "SIM105",  # contextlib.suppress — try/except/pass is clearer in hot paths
+    "SIM102",  # nested if — sometimes more readable than combined
+    "SIM112",  # __CFBundleIdentifier is a macOS constant, not our naming
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["claude_auto_continue"]

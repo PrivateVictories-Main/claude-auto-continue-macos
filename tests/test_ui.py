@@ -1,7 +1,6 @@
 """Tests for ui.py — Status dataclass and formatting helpers."""
 
 import threading
-import time
 
 from claude_auto_continue.ui import Status, TerminalUI, _fmt_elapsed, build_banner
 
@@ -81,6 +80,7 @@ class TestStatus:
 class TestBuildBanner:
     def test_returns_panel(self):
         from rich.panel import Panel
+
         banner = build_banner()
         assert isinstance(banner, Panel)
 

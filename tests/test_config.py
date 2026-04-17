@@ -1,7 +1,8 @@
 """Tests for config module — Settings validation, TOML loading, merge logic."""
 
 import pytest
-from claude_auto_continue.config import Settings, merge, load_file
+
+from claude_auto_continue.config import Settings, load_file, merge
 
 
 class TestSettingsValidation:
@@ -116,13 +117,13 @@ class TestLoadFile:
 
     def test_valid_toml(self, tmp_path):
         f = tmp_path / "config.toml"
-        f.write_text('interval = 2.0\nsilent = true\n')
+        f.write_text("interval = 2.0\nsilent = true\n")
         result = load_file(f)
         assert result["interval"] == 2.0
         assert result["silent"] is True
 
     def test_invalid_toml_returns_empty(self, tmp_path):
         f = tmp_path / "bad.toml"
-        f.write_text('this is not valid toml {{{')
+        f.write_text("this is not valid toml {{{")
         result = load_file(f)
         assert result == {}

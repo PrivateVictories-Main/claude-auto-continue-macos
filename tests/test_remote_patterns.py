@@ -3,7 +3,6 @@
 import json
 import time
 
-import pytest
 from claude_auto_continue.remote_patterns import (
     CACHE_TTL_SECONDS,
     RemotePatterns,
@@ -13,8 +12,8 @@ from claude_auto_continue.remote_patterns import (
     fetch,
 )
 
-
 # --- _parse -----------------------------------------------------------------
+
 
 class TestParse:
     def test_parses_all_fields(self):
@@ -58,15 +57,12 @@ class TestParse:
 
 # --- Cache round-trip -------------------------------------------------------
 
+
 class TestCache:
     def test_write_then_read(self, tmp_path, monkeypatch):
         cache_file = tmp_path / "cache.json"
-        monkeypatch.setattr(
-            "claude_auto_continue.remote_patterns.CACHE_PATH", cache_file
-        )
-        monkeypatch.setattr(
-            "claude_auto_continue.remote_patterns.DEFAULT_HOME", tmp_path
-        )
+        monkeypatch.setattr("claude_auto_continue.remote_patterns.CACHE_PATH", cache_file)
+        monkeypatch.setattr("claude_auto_continue.remote_patterns.DEFAULT_HOME", tmp_path)
 
         data = {"version": 1, "continue_labels": ["test"]}
         _write_cache(data)
@@ -78,9 +74,7 @@ class TestCache:
 
     def test_expired_cache_returns_none(self, tmp_path, monkeypatch):
         cache_file = tmp_path / "cache.json"
-        monkeypatch.setattr(
-            "claude_auto_continue.remote_patterns.CACHE_PATH", cache_file
-        )
+        monkeypatch.setattr("claude_auto_continue.remote_patterns.CACHE_PATH", cache_file)
 
         data = {
             "version": 1,
@@ -99,13 +93,12 @@ class TestCache:
     def test_corrupt_cache_returns_none(self, tmp_path, monkeypatch):
         cache_file = tmp_path / "cache.json"
         cache_file.write_text("not valid json {{{")
-        monkeypatch.setattr(
-            "claude_auto_continue.remote_patterns.CACHE_PATH", cache_file
-        )
+        monkeypatch.setattr("claude_auto_continue.remote_patterns.CACHE_PATH", cache_file)
         assert _read_cache() is None
 
 
 # --- fetch() fallback -------------------------------------------------------
+
 
 class TestFetch:
     def test_fetch_fails_gracefully(self, tmp_path, monkeypatch):
@@ -118,7 +111,8 @@ class TestFetch:
             "http://localhost:1/nonexistent",
         )
         monkeypatch.setattr(
-            "claude_auto_continue.remote_patterns.FETCH_TIMEOUT_SECONDS", 1,
+            "claude_auto_continue.remote_patterns.FETCH_TIMEOUT_SECONDS",
+            1,
         )
         rp = fetch()
         assert isinstance(rp, RemotePatterns)
@@ -127,9 +121,7 @@ class TestFetch:
 
     def test_fetch_uses_cache_when_available(self, tmp_path, monkeypatch):
         cache_file = tmp_path / "cache.json"
-        monkeypatch.setattr(
-            "claude_auto_continue.remote_patterns.CACHE_PATH", cache_file
-        )
+        monkeypatch.setattr("claude_auto_continue.remote_patterns.CACHE_PATH", cache_file)
         data = {
             "version": 1,
             "_fetched_at": time.time(),
@@ -143,6 +135,7 @@ class TestFetch:
 
 
 # --- RemotePatterns defaults ------------------------------------------------
+
 
 class TestDefaults:
     def test_default_empty(self):

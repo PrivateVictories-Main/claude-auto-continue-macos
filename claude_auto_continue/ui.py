@@ -145,11 +145,11 @@ class TerminalUI:
             state_text.append("  [DRY RUN]", style="yellow")
         t.add_row("State", state_text)
 
-        claude = ("detected" if self.status.claude_detected else "not running")
+        claude = "detected" if self.status.claude_detected else "not running"
         claude_style = "green" if self.status.claude_detected else "yellow"
         t.add_row("Claude app", Text(claude, style=claude_style))
 
-        ax = ("enabled" if self.status.ax_enabled else "pending")
+        ax = "enabled" if self.status.ax_enabled else "pending"
         ax_style = "green" if self.status.ax_enabled else "yellow"
         t.add_row("AX tree", Text(ax, style=ax_style))
 
@@ -164,8 +164,9 @@ class TerminalUI:
         if self.status.notes:
             t.add_row("Note", Text(self.status.notes, style="dim"))
 
-        return Panel(t, title="[bold]claude-auto-continue[/bold]",
-                     border_style="cyan", padding=(0, 1))
+        return Panel(
+            t, title="[bold]claude-auto-continue[/bold]", border_style="cyan", padding=(0, 1)
+        )
 
     # ---- log line helpers ----------------------------------------------
 
@@ -213,5 +214,6 @@ class TerminalUI:
         summary.add_row("Thanks", Text("See you next session. 👋", style="cyan"))
 
         self.console.print()
-        self.console.print(Panel(summary, title="Session summary",
-                                 border_style="cyan", padding=(1, 2)))
+        self.console.print(
+            Panel(summary, title="Session summary", border_style="cyan", padding=(1, 2))
+        )

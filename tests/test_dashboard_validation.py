@@ -1,6 +1,5 @@
 """Tests for dashboard settings input validation."""
 
-import pytest
 from claude_auto_continue.config import Settings
 from claude_auto_continue.dashboard import SharedState
 
@@ -50,18 +49,18 @@ class TestSettingsTypeValidation:
 
     def test_tuple_field_filters_non_strings(self):
         state = SharedState(settings=Settings())
-        applied = state.update_settings(
-            {"terminal_patterns": ["good", 123, None, "also good"]}
-        )
+        applied = state.update_settings({"terminal_patterns": ["good", 123, None, "also good"]})
         assert applied["terminal_patterns"] == ("good", "also good")
 
     def test_mixed_valid_and_invalid(self):
         state = SharedState(settings=Settings())
-        applied = state.update_settings({
-            "interval": 5.0,
-            "silent": "nope",
-            "verbose": True,
-        })
+        applied = state.update_settings(
+            {
+                "interval": 5.0,
+                "silent": "nope",
+                "verbose": True,
+            }
+        )
         assert "interval" in applied
         assert "silent" not in applied
         assert "verbose" in applied

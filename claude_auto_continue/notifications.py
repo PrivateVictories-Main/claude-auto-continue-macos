@@ -95,8 +95,9 @@ def send_notification(title: str, body: str) -> None:
 class Notifier:
     """Convenience wrapper that respects --silent and --no-notifications."""
 
-    def __init__(self, *, sound: bool = True, notifications: bool = True,
-                 sound_name: str = "Glass") -> None:
+    def __init__(
+        self, *, sound: bool = True, notifications: bool = True, sound_name: str = "Glass"
+    ) -> None:
         self.sound = sound
         self.notifications = notifications
         self.sound_name = sound_name

@@ -1,0 +1,55 @@
+# claude-auto-continue configuration
+# Copy this file to ~/.claude-auto-continue/config.toml
+#
+# All settings below are optional — defaults are shown.
+# CLI flags always override these values.
+
+# Polling interval in seconds (0.5–30).
+# interval = 1.5
+
+# Minimum seconds between clicks to prevent double-fires.
+# cooldown = 5.0
+
+# Stop after N auto-continues (0 = unlimited).
+# max_continues = 0
+
+# Disable the notification sound on each auto-continue.
+# silent = false
+
+# Post banners to macOS Notification Center.
+# notifications = true
+
+# Write to ~/.claude-auto-continue/activity.log.
+# log = true
+
+# Print AX tree scans and idle heartbeats (noisy).
+# verbose = false
+
+# Show what would be clicked without actually clicking.
+# dry_run = false
+
+# ── Scan targets ──────────────────────────────────────────
+# Which surfaces to monitor for Continue buttons.
+
+# Native Claude desktop app (Electron).
+# scan_app = true
+
+# claude.ai tabs in browsers (Safari, Chrome, Brave, Arc, etc.).
+# scan_browsers = true
+
+# Claude Code CLI pauses in terminal apps.
+# Disabled by default because this sends Return keystrokes.
+# scan_terminals = false
+
+# ── Custom patterns ───────────────────────────────────────
+# Add your own button labels, context keywords, or terminal patterns.
+# These are merged with the built-in lists.
+
+# Extra button labels to match (case-insensitive).
+# extra_continue_labels = ["Reprendre", "Fortsetzen"]
+
+# Extra context keywords that confirm a Claude session is active.
+# extra_context_keywords = ["mon assistant", "mein assistent"]
+
+# Extra terminal pause patterns. Prefix with "re:" for regex.
+# terminal_patterns = ["custom pause message", "re:my_tool\\s+paused"]

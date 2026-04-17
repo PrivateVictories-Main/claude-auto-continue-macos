@@ -1,7 +1,6 @@
 """Tests for monitor.py — cooldown logic, tick coordination, emit helpers."""
 
 import time
-from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
 from claude_auto_continue.config import Settings
@@ -86,11 +85,15 @@ class TestTickCoordination:
     """Test that _tick respects scan_app/scan_browsers/scan_terminals flags."""
 
     def test_tick_skips_browsers_when_disabled(self):
-        ctx = _make_ctx(settings=Settings(scan_app=False, scan_browsers=False, scan_terminals=False))
+        ctx = _make_ctx(
+            settings=Settings(scan_app=False, scan_browsers=False, scan_terminals=False)
+        )
         mon = Monitor(ctx)
-        with patch.object(mon, "_scan_app") as mock_app, \
-             patch.object(mon, "_scan_browsers") as mock_br, \
-             patch.object(mon, "_scan_terminals") as mock_term:
+        with (
+            patch.object(mon, "_scan_app") as mock_app,
+            patch.object(mon, "_scan_browsers") as mock_br,
+            patch.object(mon, "_scan_terminals") as mock_term,
+        ):
             mon._tick()
         mock_app.assert_not_called()
         mock_br.assert_not_called()
@@ -99,9 +102,11 @@ class TestTickCoordination:
     def test_tick_app_hit_skips_rest(self):
         ctx = _make_ctx(settings=Settings(scan_app=True, scan_browsers=True, scan_terminals=True))
         mon = Monitor(ctx)
-        with patch.object(mon, "_scan_app", return_value=True) as mock_app, \
-             patch.object(mon, "_scan_browsers") as mock_br, \
-             patch.object(mon, "_scan_terminals") as mock_term:
+        with (
+            patch.object(mon, "_scan_app", return_value=True) as mock_app,
+            patch.object(mon, "_scan_browsers") as mock_br,
+            patch.object(mon, "_scan_terminals") as mock_term,
+        ):
             mon._tick()
         mock_app.assert_called_once()
         mock_br.assert_not_called()
@@ -110,8 +115,10 @@ class TestTickCoordination:
     def test_tick_browser_hit_skips_terminals(self):
         ctx = _make_ctx(settings=Settings(scan_app=False, scan_browsers=True, scan_terminals=True))
         mon = Monitor(ctx)
-        with patch.object(mon, "_scan_browsers", return_value=True) as mock_br, \
-             patch.object(mon, "_scan_terminals") as mock_term:
+        with (
+            patch.object(mon, "_scan_browsers", return_value=True) as mock_br,
+            patch.object(mon, "_scan_terminals") as mock_term,
+        ):
             mon._tick()
         mock_br.assert_called_once()
         mock_term.assert_not_called()
@@ -119,8 +126,10 @@ class TestTickCoordination:
     def test_tick_falls_through_to_terminals(self):
         ctx = _make_ctx(settings=Settings(scan_app=False, scan_browsers=True, scan_terminals=True))
         mon = Monitor(ctx)
-        with patch.object(mon, "_scan_browsers", return_value=False) as mock_br, \
-             patch.object(mon, "_scan_terminals") as mock_term:
+        with (
+            patch.object(mon, "_scan_browsers", return_value=False) as mock_br,
+            patch.object(mon, "_scan_terminals") as mock_term,
+        ):
             mon._tick()
         mock_br.assert_called_once()
         mock_term.assert_called_once()

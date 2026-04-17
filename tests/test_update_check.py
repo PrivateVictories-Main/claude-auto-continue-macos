@@ -73,13 +73,13 @@ class TestCheckAsync:
     @patch("claude_auto_continue.update_check._fetch_latest", return_value="0.0.1")
     def test_no_callback_when_older(self, mock_fetch):
         called = threading.Event()
-        check_async(lambda c, l: called.set())
+        check_async(lambda _cur, _lat: called.set())
         called.wait(timeout=0.5)
         assert not called.is_set()
 
     @patch("claude_auto_continue.update_check._fetch_latest", return_value=None)
     def test_no_callback_on_fetch_fail(self, mock_fetch):
         called = threading.Event()
-        check_async(lambda c, l: called.set())
+        check_async(lambda _cur, _lat: called.set())
         called.wait(timeout=0.5)
         assert not called.is_set()
