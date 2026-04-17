@@ -88,6 +88,16 @@ class TestArgParser:
         args = parser.parse_args(["--no-log"])
         assert args.log is False
 
+    def test_update_check_default(self):
+        parser = build_parser()
+        args = parser.parse_args([])
+        assert args.update_check is True
+
+    def test_no_update_check(self):
+        parser = build_parser()
+        args = parser.parse_args(["--no-update-check"])
+        assert args.update_check is False
+
 
 class TestArgsToDict:
     def test_all_none_by_default(self):

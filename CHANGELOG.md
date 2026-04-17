@@ -4,6 +4,10 @@ All notable changes to claude-auto-continue are documented here.
 
 ## [0.7.2] - 2026-04-17
 
+### Added
+- Auto-update check: background PyPI version check at startup, disable with `--no-update-check`
+- 4 new test files: permissions, notifications, ui, monitor — **354 total tests** across 14 files
+
 ### Fixed
 - Dashboard: Content-Length validation now rejects negative and non-numeric values
 - Dashboard: CORS origin matching expanded to include `localhost` and port variants
