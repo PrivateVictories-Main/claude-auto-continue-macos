@@ -107,45 +107,54 @@ mutually exclusive.
 
 ## Quick start
 
-1. **Clone the repo**
-   ```bash
-   git clone https://github.com/PrivateVictories-Main/claude-auto-continue-macos.git
-   cd claude-auto-continue-macos
-   ```
+### Option A: Homebrew (recommended)
 
-2. **Install dependencies**
-   ```bash
-   pip install .
-   # or, if you prefer not to install the package:
-   pip install -r requirements.txt
-   ```
+```bash
+brew install PrivateVictories-Main/tap/claude-auto-continue
+claude-auto-continue --setup
+```
 
-3. **Run the one-time setup walkthrough**
-   ```bash
-   claude-auto-continue --setup
-   ```
+That's it. Two commands. The setup wizard grants Accessibility permission
+and optionally installs a background service. To run forever as a
+LaunchAgent:
 
-   This opens System Settings straight to the Accessibility pane, tells
-   you the exact interpreter path to paste in, spins until the toggle
-   flips on, optionally installs the background LaunchAgent, and runs a
-   self-test against the Claude app. The whole thing takes under a
-   minute.
+```bash
+brew services start claude-auto-continue
+```
 
-   If you'd rather do it manually: open **System Settings → Privacy &
-   Security → Accessibility**, click the `+`, and add either your
-   terminal app (for one-shot CLI use) or the interpreter at
-   `.venv/bin/python` (for the LaunchAgent). Either path prints below
-   on the first failed run, so you don't need to remember it.
+### Option B: One-liner install script
 
-4. **Run it**
-   ```bash
-   claude-auto-continue
-   # or:
-   python -m claude_auto_continue
-   ```
+```bash
+curl -fsSL https://raw.githubusercontent.com/PrivateVictories-Main/claude-auto-continue-macos/main/scripts/install.sh | bash
+```
 
-5. **Open Claude and start a long session.** The tool handles the rest.
-   Press **Ctrl+C** any time to exit cleanly with a session summary.
+Finds Python 3.9+, clones the repo to `~/.claude-auto-continue-macos/`,
+creates a virtualenv, installs everything, adds a shell alias, and
+offers to run `--setup` at the end. Nothing touches system Python or
+`/usr/local`.
+
+### Option C: Manual install
+
+```bash
+git clone https://github.com/PrivateVictories-Main/claude-auto-continue-macos.git
+cd claude-auto-continue-macos
+pip install .
+claude-auto-continue --setup
+```
+
+The setup wizard opens System Settings straight to the Accessibility pane,
+tells you the exact interpreter path to paste in, spins until the toggle
+flips on, optionally installs the background LaunchAgent, and runs a
+self-test against the Claude app. The whole thing takes under a minute.
+
+### Then just run it
+
+```bash
+claude-auto-continue
+```
+
+Open Claude and start a long session. The tool handles the rest.
+Press **Ctrl+C** any time to exit cleanly with a session summary.
 
 ---
 
@@ -464,7 +473,9 @@ Honesty section:
 - [x] Regex terminal patterns (v0.6.0)
 - [x] 202 unit tests (v0.6.0)
 - [x] User-configurable button-text patterns (v0.6.0)
-- [ ] Homebrew formula for one-command install
+- [x] Homebrew formula — `brew install PrivateVictories-Main/tap/claude-auto-continue` (v0.6.0)
+- [x] One-liner install script — `curl | bash` (v0.6.0)
+- [x] `brew services start` for LaunchAgent management (v0.6.0)
 - [ ] Optional menu bar companion icon with status
 - [ ] Windows support via UI Automation API
 - [ ] Optional auto-update check
