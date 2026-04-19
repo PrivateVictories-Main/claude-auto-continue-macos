@@ -115,7 +115,17 @@ CLAUDE_CODE_PAUSE_PATTERNS: tuple[str, ...] = (
     "tool use limit",
     "reached its limit",
     "reached the limit",
-    "usage limit",
+    # Usage / rate / session-window limit — reset-time phrasing (Claude Code
+    # "try again at 11am" messages). We deliberately require a "reached"/
+    # "hit"/"exceeded"/reset-time companion so the 90 %-used *warning*
+    # ("approaching usage limit — 10% remaining") does NOT fire Return.
+    "usage limit reached",
+    "usage limit hit",
+    "usage limit exceeded",
+    "rate limit reached",
+    "rate limit hit",
+    "rate limit exceeded",
+    "limit will reset",
     # Pause / resume phrasing
     "claude code paused",
     "claude code has paused",
@@ -127,6 +137,14 @@ CLAUDE_CODE_PAUSE_PATTERNS: tuple[str, ...] = (
     r"re:continue\?\s*[\(\[]\s*[yn]",
     r"re:tool[\s-]use\s+limit",
     r"re:(?:paused|waiting).*continue",
+    # N-hour / N-minute session-window limit ("5-hour limit reached", "1 hour limit")
+    r"re:\d+[-\s]?(?:hour|minute|min)\s+limit",
+    # "try again in/at/after ..." and "retry after/at ..." — shown alongside
+    # the usage-reset message; matching either means Claude Code is blocked.
+    r"re:try\s+again\s+(?:in|at|after)\b",
+    r"re:retry\s+(?:after|at)\b",
+    # "resets at 11am" / "resets in 3 hours" / "will reset at ..." windows.
+    r"re:(?:will\s+)?resets?\s+(?:at|in)\b",
 )
 
 # Virtual key code for Return — the keystroke we synthesise on a match.

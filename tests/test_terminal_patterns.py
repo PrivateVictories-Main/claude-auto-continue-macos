@@ -49,10 +49,28 @@ class TestSubstringPatterns:
             "Tool Use Limit",
             "Reached its limit",
             "Reached the limit",
-            "Usage limit",
+            "Usage limit reached",
+            "Usage limit hit",
+            "Rate limit reached",
+            "Limit will reset at 11am",
         ],
     )
     def test_limit_phrasing(self, text):
+        assert _match_pattern(text, CLAUDE_CODE_PAUSE_PATTERNS) is not None
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "Claude usage limit reached. Your limit will reset at 11am (America/New_York).",
+            "You have reached your usage limit. Try again in 4 hours.",
+            "Claude Code: rate limit reached, retry after 2026-04-19T15:00:00Z",
+            "5-hour limit reached ∙ resets 11am",
+            "1 hour limit reached — resets at 3pm EDT",
+            "╭─ Claude Code ─╮  Paused: usage limit reached. Resets at 11:00 AM EDT.",
+        ],
+    )
+    def test_usage_reset_phrasing(self, text):
+        """The whole point of the tool: auto-continue after the window resets."""
         assert _match_pattern(text, CLAUDE_CODE_PAUSE_PATTERNS) is not None
 
     @pytest.mark.parametrize(
@@ -133,6 +151,10 @@ class TestNoMatch:
             "Click OK to proceed",
             "",
             "   ",
+            # Warning shown at 90% consumed — NOT a pause, must not fire Return.
+            "Approaching usage limit — 10% remaining",
+            "You are approaching your usage limit",
+            "Warning: approaching rate limit",
         ],
     )
     def test_irrelevant_text_rejected(self, text):
