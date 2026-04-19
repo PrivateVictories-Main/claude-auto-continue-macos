@@ -2,6 +2,16 @@
 
 All notable changes to claude-auto-continue are documented here.
 
+## [0.7.5] - 2026-04-19
+
+### Added
+- Usage-limit-reset terminal patterns: catches Claude Code's "Usage limit reached. Resets at 11am", "5-hour limit reached", "rate limit reached — retry after ...", and "try again in 4 hours" variants so the tool resumes sessions after the limit window rolls over. This is the core scenario the project is built for.
+- Regex patterns for N-hour/N-minute limit phrasings, "try again in/at/after ...", "retry after/at ...", and "(will) reset at/in ..."
+- **371 tests** (was 359): +6 positive cases for usage-reset phrasings, +3 negative cases guarding the "approaching usage limit" warning
+
+### Fixed
+- False positive: bare `"usage limit"` substring matched the 90 %-remaining *warning* ("Approaching usage limit — 10% remaining"), which would have caused the terminal scanner to fire Return while the session was still operating normally. Replaced with specific `"usage limit reached|hit|exceeded"` variants plus reset-time regexes.
+
 ## [0.7.4] - 2026-04-17
 
 ### Added
